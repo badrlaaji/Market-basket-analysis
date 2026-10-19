@@ -1,8 +1,10 @@
 """Customer segments: RFM -> log -> StandardScaler -> KMeans (k = 4).
 
-clean.parquet -> outputs/segments.parquet, outputs/segment_profiles.parquet
+clean.parquet -> outputs/segments.parquet, outputs/segment_profiles.parquet,
+outputs/segments_k_report.json
 """
 
+import json
 import time
 from datetime import date
 from pathlib import Path
@@ -22,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLEAN_PARQUET = ROOT / "data" / "interim" / "clean.parquet"
 SEGMENTS_PARQUET = ROOT / "outputs" / "segments.parquet"
 PROFILES_PARQUET = ROOT / "outputs" / "segment_profiles.parquet"
+K_REPORT_JSON = ROOT / "outputs" / "segments_k_report.json"
 
 # Choices measured in step 4 (DECISIONS.md D04-1 to D04-4)
 FEATURES = ["recency", "log_frequency", "log_monetary"]  # skew 12 and 25 before log
@@ -110,6 +113,24 @@ def name_segments(profiles: pd.DataFrame) -> pd.DataFrame:
     return ordered.assign(segment=range(len(SEGMENT_NAMES)), segment_name=SEGMENT_NAMES)
 
 
+def add_shares(profiles: pd.DataFrame) -> pd.DataFrame:
+    """Share of all customers and share of all revenue of each segment."""
+    revenue = profiles["monetary_mean"] * profiles["n_customers"]  # segment total
+    return profiles.assign(
+        customer_share=profiles["n_customers"] / profiles["n_customers"].sum(),
+        revenue_share=revenue / revenue.sum(),
+    )
+
+
+def k_report(scores: dict[int, float], k: int) -> dict:
+    """Silhouette of each k tried and the k kept, as plain Python types."""
+    return {
+        "k": k,
+        "metric": "silhouette, squared Euclidean distance (Spark default)",
+        "scores": [{"k": key, "silhouette": float(v)} for key, v in scores.items()],
+    }
+
+
 def main() -> None:
     """clean.parquet -> segments and profiles, read back, then log the run."""
     start = time.perf_counter()
@@ -122,16 +143,17 @@ def main() -> None:
     models = {k: fit_kmeans(features, k) for k in K_RANGE}
     scores = {k: silhouette(model, features) for k, model in models.items()}
     clustered = models[K].transform(features)
-    profiles = name_segments(profile_clusters(clustered))
+    profiles = add_shares(name_segments(profile_clusters(clustered)))
 
     ids = spark.createDataFrame(profiles[["prediction", "segment"]])
     segments = clustered.join(ids, "prediction").select(
         "customer_id", "recency", "frequency", "monetary", "segment"
     )
     segments.coalesce(1).write.mode("overwrite").parquet(str(SEGMENTS_PARQUET))
-    columns = ["segment", "segment_name", "n_customers"]
-    columns += ["recency_mean", "frequency_mean", "monetary_mean"]
+    columns = ["segment", "segment_name", "n_customers", "customer_share"]
+    columns += ["revenue_share", "recency_mean", "frequency_mean", "monetary_mean"]
     profiles[columns].to_parquet(PROFILES_PARQUET, index=False)
+    K_REPORT_JSON.write_text(json.dumps(k_report(scores, K), indent=2))
 
     back = spark.read.parquet(str(SEGMENTS_PARQUET))
     n_customers = back.count()
@@ -140,7 +162,8 @@ def main() -> None:
         print(f"k={k}: silhouette (squared Euclidean) {score:.3f}")
     print(f"Wrote {SEGMENTS_PARQUET.relative_to(ROOT)}: {n_customers:,} customers")
     print(f"Wrote {PROFILES_PARQUET.relative_to(ROOT)}")
-    print(profiles[columns].round(1).to_string(index=False))
+    print(profiles[columns].round(3).to_string(index=False))
+    print(f"Wrote {K_REPORT_JSON.relative_to(ROOT)}")
     spark.stop()
 
     metrics = {"n_customers": n_customers}

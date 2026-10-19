@@ -44,6 +44,8 @@ PROFILES = pd.DataFrame(
         "segment": [0, 1],
         "segment_name": ["Champions", "Lost"],
         "n_customers": [3, 3],
+        "customer_share": [0.5, 0.5],
+        "revenue_share": [0.5636, 0.4364],  # 1,550 and 1,200 of 2,750
         "recency_mean": [11.67, 400.0],
         "frequency_mean": [8.0, 1.33],
         "monetary_mean": [516.67, 400.0],
@@ -58,6 +60,45 @@ SCORES = pd.DataFrame(
         "monetary_net": [500.0, 300.0, 0.0, 100.0, 900.0, 50.0],  # 103 cancelled all
     }
 )
+TOP_PRODUCTS = pd.DataFrame(
+    {
+        "segment": [0, 0, 1],
+        "rank": [1, 2, 1],
+        "stock_code": ["B", "A", "E"],
+        "description": ["BLUE LAMP", "RED MUG", "TEA SET"],
+        "customer_share": [0.67, 1.0, 0.33],
+        "preference": [1.5, 1.2, 2.0],
+    }
+)
+MONTHLY = pd.DataFrame(
+    {
+        "month": ["2011-11", "2011-12"],
+        "revenue": [1000.0, 200.0],
+        "n_invoices": [10, 3],
+        "n_customers": [8, 3],
+        "complete": [True, False],
+    }
+)
+MODEL_REPORT = {
+    "pr": {
+        "model": [{"x": 0.0, "y": 1.0}, {"x": 1.0, "y": 0.4}],
+        "baseline": [{"x": 0.0, "y": 0.8}, {"x": 1.0, "y": 0.4}],
+    },
+    "roc": {
+        "model": [{"x": 0.0, "y": 0.0}, {"x": 1.0, "y": 1.0}],
+        "baseline": [{"x": 0.0, "y": 0.0}, {"x": 1.0, "y": 1.0}],
+    },
+    "calibration": [{"proba_mean": 0.2, "rate": 0.3, "n": 4, "ci95": 0.45}],
+    "importances": [
+        {"feature": "frequency", "importance": 0.6},
+        {"feature": "recency", "importance": 0.4},
+    ],
+}
+K_REPORT = {
+    "k": 4,
+    "metric": "silhouette, squared Euclidean distance (Spark default)",
+    "scores": [{"k": 2, "silhouette": 0.6}, {"k": 3, "silhouette": 0.55}],
+}
 STATS = {
     "raw_rows": 10,
     "clean_rows": 8,
@@ -94,7 +135,11 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     SEGMENTS.to_parquet(tmp_path / "segments.parquet")
     PROFILES.to_parquet(tmp_path / "segment_profiles.parquet")
     SCORES.to_parquet(tmp_path / "repurchase_scores.parquet")
+    TOP_PRODUCTS.to_parquet(tmp_path / "segment_top_products.parquet")
+    MONTHLY.to_parquet(tmp_path / "monthly_sales.parquet")
     (tmp_path / "stats.json").write_text(json.dumps(STATS))
+    (tmp_path / "model_report.json").write_text(json.dumps(MODEL_REPORT))
+    (tmp_path / "segments_k_report.json").write_text(json.dumps(K_REPORT))
     monkeypatch.setenv("OUTPUTS_DIR", str(tmp_path))
     with TestClient(app) as test_client:
         yield test_client
@@ -137,11 +182,36 @@ def test_rules_product_search_by_name(client: TestClient) -> None:
 
 @pytest.mark.parametrize(
     "query",
-    ["min_confidence=1.5", "min_lift=-1", "limit=0", "limit=501", "sort=price"],
+    ["min_confidence=1.5", "min_lift=-1", "limit=0", "limit=2001", "sort=price"],
 )
 def test_rules_rejects_bad_parameters(client: TestClient, query: str) -> None:
     """Out-of-range or unknown values are rejected with 422."""
     assert client.get(f"/rules?{query}").status_code == 422
+
+
+def test_rules_limit_up_to_2000(client: TestClient) -> None:
+    """The /rules chart loads every rule: limit accepts up to 2,000."""
+    body = client.get("/rules?limit=2000").json()
+    assert (body["total"], len(body["rules"])) == (5, 5)
+
+
+def test_rules_export_csv(client: TestClient) -> None:
+    """Same filters as /rules, no limit; antecedents joined with " + "."""
+    response = client.get("/rules/export?min_lift=2")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+    lines = response.text.splitlines()
+    assert lines[0] == (
+        "antecedent,antecedent_names,consequent,consequent_name,support,confidence,lift"
+    )
+    assert len(lines) == 1 + 4  # header + the 4 rules with lift >= 2
+    assert lines[1] == "A + D,RED MUG + PINK BAG,C,GREEN BOX,0.05,0.5,4.0"
+
+
+def test_rules_export_rejects_bad_parameters(client: TestClient) -> None:
+    """The export validates its filters like /rules."""
+    assert client.get("/rules/export?min_confidence=2").status_code == 422
 
 
 def test_products_search(client: TestClient) -> None:
@@ -173,6 +243,10 @@ def test_recommend_dedup_by_best_lift(client: TestClient) -> None:
         ("C", 4.0, ["A", "D"]),
         ("B", 3.0, ["A"]),
     ]
+    # base rate = confidence / lift: 0.5 / 4.0 and 0.6 / 3.0
+    assert [r["base_rate"] for r in body["recommendations"]] == pytest.approx(
+        [0.125, 0.2]
+    )
     assert body["recommendations"][0]["description"] == "GREEN BOX"
     assert body["unknown_codes"] == ["ZZZ"]
 
@@ -200,11 +274,102 @@ def test_recommend_rejects_bad_body(client: TestClient, payload: dict) -> None:
 
 
 def test_segments(client: TestClient) -> None:
-    """Profiles with share of customers and median R, F, M."""
+    """Profiles with shares, median R, F, M and the segment's top products."""
     body = client.get("/segments").json()
     assert [s["segment_name"] for s in body] == ["Champions", "Lost"]
-    assert body[0]["share"] == 0.5
+    assert (body[0]["customer_share"], body[0]["revenue_share"]) == (0.5, 0.5636)
     assert (body[0]["recency_median"], body[1]["monetary_median"]) == (10.0, 300.0)
+    assert [p["stock_code"] for p in body[0]["top_products"]] == ["B", "A"]
+    assert [p["stock_code"] for p in body[1]["top_products"]] == ["E"]
+
+
+def test_segments_radar_scores(client: TestClient) -> None:
+    """Mean percentile rank x 100; recent customers score high on recency."""
+    champions, lost = client.get("/segments").json()
+    # -recency ranks: 101 (5 days) 6/6, 105 5/6, 106 4/6 | 102 3/6, 103 2/6, 104 1/6
+    assert champions["score_recency"] == pytest.approx(500 / 6)
+    assert lost["score_recency"] == pytest.approx(200 / 6)
+    for key in ["score_frequency", "score_monetary", "score_basket"]:
+        assert 0 <= lost[key] <= 100
+    assert champions["score_repurchase"] > lost["score_repurchase"]
+
+
+def test_segments_revenue_by_band(client: TestClient) -> None:
+    """Revenue per frequency band: 105 (8) and 106 (6) both in 5-9."""
+    champions, lost = client.get("/segments").json()
+    assert {
+        b["frequency_band"]: b["revenue"] for b in champions["revenue_by_band"]
+    } == {
+        "5-9": 1050.0,
+        "10+": 500.0,
+    }
+    assert {b["frequency_band"]: b["n_customers"] for b in lost["revenue_by_band"]} == {
+        "1": 2,
+        "2": 1,
+    }
+
+
+def test_segments_map(client: TestClient) -> None:
+    """Sample keeps each segment's share; no customer id; same sample twice."""
+    points = client.get("/segments/map?n=3").json()
+    assert set(points[0]) == {"recency", "frequency", "monetary", "segment"}
+    assert sorted(p["segment"] for p in points) == [0, 0, 1, 1]  # half of 3 + 3
+    assert client.get("/segments/map?n=3").json() == points
+    assert len(client.get("/segments/map").json()) == 6  # default n > customers
+
+
+@pytest.mark.parametrize("query", ["n=0", "n=6001"])
+def test_segments_map_rejects_bad_n(client: TestClient, query: str) -> None:
+    """n outside [1, 6000]: 422."""
+    assert client.get(f"/segments/map?{query}").status_code == 422
+
+
+def test_segments_grid(client: TestClient) -> None:
+    """5 recency quintiles x 5 fixed frequency bands, every customer counted once."""
+    cells = client.get("/segments/grid").json()
+    assert len(cells) == 25
+    assert sum(c["n_customers"] for c in cells) == 6
+    by_cell = {(c["recency_quintile"], c["frequency_band"]): c for c in cells}
+    # Recency 5 and 10 days: first quintile; frequency 10 -> "10+", 8 -> "5-9"
+    assert by_cell[(1, "10+")]["n_customers"] == 1
+    assert by_cell[(1, "5-9")]["top_segment"] == 0
+    assert (by_cell[(1, "1")]["n_customers"], by_cell[(1, "1")]["top_segment"]) == (
+        0,
+        None,
+    )
+    assert (by_cell[(1, "1")]["recency_min"], by_cell[(1, "1")]["recency_max"]) == (
+        5,
+        10,
+    )
+    assert by_cell[(5, "1")]["top_segment"] == 1  # customer 104: 500 days, 1 invoice
+
+
+def test_segments_k(client: TestClient) -> None:
+    """The k report is returned as written by the pipeline."""
+    assert client.get("/segments/k").json() == K_REPORT
+
+
+def test_scenarios(client: TestClient) -> None:
+    """Only antecedents of 2+ products: {A, D}, with its product names."""
+    assert client.get("/scenarios").json() == [
+        {"items": ["A", "D"], "names": ["RED MUG", "PINK BAG"], "n_rules": 1}
+    ]
+
+
+def test_timeline(client: TestClient) -> None:
+    """Monthly sales as written by the pipeline, partial month flagged."""
+    body = client.get("/timeline").json()
+    assert [m["month"] for m in body] == ["2011-11", "2011-12"]
+    assert [m["complete"] for m in body] == [True, False]
+
+
+def test_model(client: TestClient) -> None:
+    """Metrics from stats.json, curves and calibration from model_report.json."""
+    body = client.get("/model").json()
+    assert body["metrics"] == STATS["model"]
+    assert body["pr"]["model"][0] == {"x": 0.0, "y": 1.0}
+    assert body["calibration"][0]["n"] == 4
+    assert [i["feature"] for i in body["importances"]] == ["frequency", "recency"]
 
 
 def test_stats(client: TestClient) -> None:
@@ -216,6 +381,7 @@ def test_at_risk_threshold_sort_and_top(client: TestClient) -> None:
     """4 customers below 0.3; highest net value first; integer ids; top 2."""
     body = client.get("/at-risk?threshold=0.3&top=2").json()
     assert body["total"] == 4
+    assert body["revenue_at_risk"] == 450.0  # net: 300 + 0 + 100 + 50, all 4 counted
     assert [c["customer_id"] for c in body["customers"]] == [102, 104]
     assert all(isinstance(c["customer_id"], int) for c in body["customers"])
     assert body["customers"][0]["segment_name"] == "Lost"
@@ -231,7 +397,32 @@ def test_at_risk_customer_who_cancelled_everything_comes_last(
     assert (last["monetary"], last["monetary_net"]) == (800.0, 0.0)
 
 
-@pytest.mark.parametrize("query", ["threshold=1.5", "threshold=-0.1", "top=0"])
+def test_at_risk_one_segment(client: TestClient) -> None:
+    """segment=0: only customer 106 (0.25) is below 0.3."""
+    body = client.get("/at-risk?threshold=0.3&segment=0").json()
+    assert (body["total"], body["revenue_at_risk"]) == (1, 50.0)
+    assert [c["customer_id"] for c in body["customers"]] == [106]
+    assert client.get("/at-risk?segment=7").json()["total"] == 0  # unknown segment
+
+
+def test_at_risk_histogram(client: TestClient) -> None:
+    """20 bins of width 0.05; every customer in one bin; net spend summed."""
+    bins = client.get("/at-risk/histogram").json()
+    assert len(bins) == 20
+    assert sum(b["n_customers"] for b in bins) == 6
+    assert bins[1] == {
+        "start": 0.05,
+        "end": 0.1,
+        "n_customers": 1,
+        "monetary_net": 100.0,
+    }
+    lost = client.get("/at-risk/histogram?segment=1").json()
+    assert [b["n_customers"] for b in lost if b["n_customers"]] == [1, 1, 1]
+
+
+@pytest.mark.parametrize(
+    "query", ["threshold=1.5", "threshold=-0.1", "top=0", "segment=-1"]
+)
 def test_at_risk_rejects_bad_parameters(client: TestClient, query: str) -> None:
     """Threshold outside [0, 1] or top < 1: 422."""
     assert client.get(f"/at-risk?{query}").status_code == 422

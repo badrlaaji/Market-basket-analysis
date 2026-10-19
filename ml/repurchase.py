@@ -1,7 +1,8 @@
 """Repurchase within 90 days: XGBoost vs a recency baseline, tracked with MLflow.
 
 clean.parquet (+ raw.parquet for cancellations)
-  -> outputs/repurchase_scores.parquet, data/interim/repurchase_metrics.json
+  -> outputs/repurchase_scores.parquet, outputs/model_report.json,
+     data/interim/repurchase_metrics.json
 """
 
 import json
@@ -9,8 +10,14 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
-from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.metrics import (
+    average_precision_score,
+    precision_recall_curve,
+    roc_auc_score,
+    roc_curve,
+)
 from xgboost import XGBClassifier
 
 from pipeline.etl import NON_PRODUCT_CODES
@@ -22,6 +29,7 @@ CLEAN_PARQUET = ROOT / "data" / "interim" / "clean.parquet"
 SEGMENTS_PARQUET = ROOT / "outputs" / "segments.parquet"
 SCORES_PARQUET = ROOT / "outputs" / "repurchase_scores.parquet"
 METRICS_JSON = ROOT / "data" / "interim" / "repurchase_metrics.json"
+MODEL_REPORT_JSON = ROOT / "outputs" / "model_report.json"
 
 # Dates fixed in C7 and measured in step 5 (DECISIONS.md D05-1 to D05-3)
 HORIZON_DAYS = 90
@@ -46,6 +54,8 @@ XGB_PARAMS = {
     "n_jobs": 2,
 }
 SCORE_COLUMNS = ["customer_id", "proba_90d", "segment", "monetary", "monetary_net"]
+CURVE_POINTS = 100  # points kept per curve: enough for a smooth line
+CALIBRATION_BINS = 10  # deciles of the predicted probability
 EXPERIMENT = "repurchase"
 
 
@@ -121,6 +131,71 @@ def evaluate(labels: pd.Series, scores: pd.Series) -> dict[str, float]:
     }
 
 
+def thin_curve(
+    xs: np.ndarray, ys: np.ndarray, n_points: int = CURVE_POINTS
+) -> list[dict[str, float]]:
+    """About n_points real points of a curve, evenly spaced; first and last kept."""
+    index = np.unique(np.linspace(0, len(xs) - 1, n_points).round().astype(int))
+    return [{"x": float(xs[i]), "y": float(ys[i])} for i in index]
+
+
+def curves(labels: pd.Series, scores: pd.Series) -> dict[str, list[dict[str, float]]]:
+    """Precision-recall (x = recall) and ROC (x = false positive rate) points."""
+    precision, recall, _ = precision_recall_curve(labels, scores)
+    fpr, tpr, _ = roc_curve(labels, scores)
+    # sklearn returns recall from 1 down to 0: reversed to draw left to right
+    return {
+        "pr": thin_curve(recall[::-1], precision[::-1]),
+        "roc": thin_curve(fpr, tpr),
+    }
+
+
+def calibration_bins(
+    labels: pd.Series, proba: pd.Series, n_bins: int = CALIBRATION_BINS
+) -> list[dict[str, float]]:
+    """Mean predicted probability vs observed rate, per decile of probability."""
+    deciles = pd.qcut(proba, n_bins, labels=False, duplicates="drop")
+    table = (
+        pd.DataFrame({"proba": proba, "label": labels})
+        .groupby(deciles)
+        .agg(proba_mean=("proba", "mean"), rate=("label", "mean"), n=("label", "size"))
+    )
+    # 95 % interval of a proportion (normal approximation: about 500 customers per bin)
+    table["ci95"] = 1.96 * np.sqrt(table["rate"] * (1 - table["rate"]) / table["n"])
+    return [
+        {
+            "proba_mean": float(row.proba_mean),
+            "rate": float(row.rate),
+            "n": int(row.n),
+            "ci95": float(row.ci95),
+        }
+        for row in table.itertuples()
+    ]
+
+
+def importances(model: XGBClassifier) -> list[dict[str, float]]:
+    """Feature importances (gain, sum = 1), largest first."""
+    pairs = zip(FEATURES, model.feature_importances_.tolist())
+    ranked = sorted(pairs, key=lambda pair: pair[1], reverse=True)
+    return [{"feature": name, "importance": value} for name, value in ranked]
+
+
+def model_report(
+    labels: pd.Series,
+    proba: pd.Series,
+    baseline: pd.Series,
+    model: XGBClassifier,
+) -> dict:
+    """Curves of the model and the baseline, calibration and importances (JSON)."""
+    model_curves, baseline_curves = curves(labels, proba), curves(labels, baseline)
+    return {
+        "pr": {"model": model_curves["pr"], "baseline": baseline_curves["pr"]},
+        "roc": {"model": model_curves["roc"], "baseline": baseline_curves["roc"]},
+        "calibration": calibration_bins(labels, proba),
+        "importances": importances(model),
+    }
+
+
 def score_date(df: pd.DataFrame) -> date:
     """Day after the last invoice (same reference date as the segments)."""
     return df["invoice_date"].max().date() + timedelta(days=1)
@@ -181,6 +256,8 @@ def main() -> None:
     proba_test = predict(model, test)
     model_scores = evaluate(test["label"], proba_test)
     baseline_scores = evaluate(test["label"], recency_baseline(test))
+    report = model_report(test["label"], proba_test, recency_baseline(test), model)
+    MODEL_REPORT_JSON.write_text(json.dumps(report, indent=2))
 
     # Final scoring with the validated model (D05-3)
     ref_date = score_date(df)
@@ -209,6 +286,7 @@ def main() -> None:
     METRICS_JSON.write_text(json.dumps(summary, indent=2))
     print(f"Wrote {SCORES_PARQUET.relative_to(ROOT)}: {len(back):,} customers")
     print(f"Wrote {METRICS_JSON.relative_to(ROOT)}")
+    print(f"Wrote {MODEL_REPORT_JSON.relative_to(ROOT)}")
     print(back.dtypes.to_string())
     print(
         f"RFM vs segments.parquet ({len(segments):,} customers): {rfm_gap(now, segments)}"
@@ -221,11 +299,16 @@ def main() -> None:
     )
     for key, value in summary.items():
         print(f"{key}: {value}")
-    importances = dict(zip(FEATURES, model.feature_importances_.tolist()))
+    gains = {row["feature"]: row["importance"] for row in report["importances"]}
     print(
         "feature importances (gain, sum = 1):",
-        {k: round(v, 3) for k, v in importances.items()},
+        {k: round(v, 3) for k, v in gains.items()},
     )
+    for row in report["calibration"]:
+        print(
+            f"calibration: mean proba {row['proba_mean']:.3f}, "
+            f"observed {row['rate']:.3f} +/- {row['ci95']:.3f} (n={row['n']})"
+        )
 
     keys = ["train_date", "test_date", "score_date", "horizon_days"]
     params = {key: summary[key] for key in keys}
@@ -233,7 +316,7 @@ def main() -> None:
     metrics = {k: v for k, v in summary.items() if k not in params}
     metrics["n_scored"] = len(back)
     metrics["mean_proba_scored"] = float(back["proba_90d"].mean())
-    metrics |= {f"importance_{k}": v for k, v in importances.items()}
+    metrics |= {f"importance_{k}": v for k, v in gains.items()}
     metrics["duration_s"] = round(time.perf_counter() - start, 1)
     log_run(EXPERIMENT, "xgboost-vs-recency", params, metrics)
 

@@ -3,19 +3,25 @@
 from datetime import date, datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from ml.repurchase import (
     COLUMNS,
+    FEATURES,
     build_dataset,
     build_features,
+    calibration_bins,
     cancelled_amounts,
+    curves,
     evaluate,
+    importances,
     load_transactions,
     recency_baseline,
     score_customers,
     score_date,
+    thin_curve,
     train_model,
 )
 
@@ -161,3 +167,49 @@ def test_score_customers_fails_on_missing_segment(transactions: pd.DataFrame) ->
     features = build_features(transactions, REF)
     with pytest.raises(ValueError):
         score_customers(model, features, segments, pd.Series(dtype="float64"))
+
+
+def test_thin_curve_keeps_both_ends() -> None:
+    """1,001 points -> 100 real points, first and last kept; never more points."""
+    xs = np.linspace(0, 1, 1001)
+    points = thin_curve(xs, xs**2, n_points=100)
+    assert len(points) == 100
+    assert points[0] == {"x": 0.0, "y": 0.0}
+    assert points[-1] == {"x": 1.0, "y": 1.0}
+    assert len(thin_curve(np.array([0.0, 1.0]), np.array([0.0, 1.0]))) == 2
+
+
+def test_curves_of_a_perfect_score() -> None:
+    """Perfect ranking: precision 1 at full recall, ROC through (0, 1)."""
+    labels = pd.Series([0, 0, 1, 1])
+    result = curves(labels, pd.Series([0.1, 0.2, 0.8, 0.9]))
+    recalls = [point["x"] for point in result["pr"]]
+    assert recalls == sorted(recalls)  # drawn from left to right
+    assert {"x": 1.0, "y": 1.0} in result["pr"]
+    assert {"x": 0.0, "y": 1.0} in result["roc"]
+    assert result["roc"][-1] == {"x": 1.0, "y": 1.0}
+
+
+def test_calibration_bins_by_hand() -> None:
+    """2 bins of 4 customers: mean probability, observed rate, 95 % interval."""
+    proba = pd.Series([0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9])
+    labels = pd.Series([0, 0, 0, 1, 1, 1, 0, 1])
+    bins = calibration_bins(labels, proba, n_bins=2)
+    assert [b["n"] for b in bins] == [4, 4]
+    assert [b["proba_mean"] for b in bins] == pytest.approx([0.25, 0.75])
+    assert [b["rate"] for b in bins] == [0.25, 0.75]
+    # 1.96 x sqrt(0.25 x 0.75 / 4) = 0.424
+    assert bins[0]["ci95"] == pytest.approx(0.4244, abs=1e-4)
+
+
+def test_importances_sorted_and_sum_to_one() -> None:
+    """Label driven by recency only: recency first, gains summing to 1."""
+    rng = np.random.default_rng(0)
+    train = pd.DataFrame(rng.random((200, len(FEATURES))), columns=FEATURES)
+    train["label"] = (train["recency"] < 0.5).astype("int64")
+    ranked = importances(train_model(train))
+    assert sorted(row["feature"] for row in ranked) == sorted(FEATURES)
+    assert ranked[0]["feature"] == "recency"
+    values = [row["importance"] for row in ranked]
+    assert values == sorted(values, reverse=True)
+    assert sum(values) == pytest.approx(1.0, abs=1e-6)

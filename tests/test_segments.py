@@ -1,5 +1,6 @@
 """Tests for pipeline.segments, on tiny hand-made DataFrames."""
 
+import json
 from datetime import date, datetime
 
 import numpy as np
@@ -9,8 +10,10 @@ from pyspark.ml.linalg import Vectors
 from pyspark.sql import DataFrame, SparkSession
 
 from pipeline.segments import (
+    add_shares,
     compute_rfm,
     fit_kmeans,
+    k_report,
     name_segments,
     reference_date,
     scale_features,
@@ -96,3 +99,22 @@ def test_name_segments_needs_four_clusters() -> None:
     profiles = pd.DataFrame({"prediction": [0, 1, 2], "recency_mean": [1.0, 2.0, 3.0]})
     with pytest.raises(ValueError):
         name_segments(profiles)
+
+
+def test_add_shares() -> None:
+    """Customer share from the counts; revenue share from mean x count."""
+    profiles = pd.DataFrame({"n_customers": [1, 3], "monetary_mean": [300.0, 100.0]})
+    shares = add_shares(profiles)
+    assert shares["customer_share"].tolist() == [0.25, 0.75]
+    assert shares["revenue_share"].tolist() == [0.5, 0.5]  # 300 vs 3 x 100
+
+
+def test_k_report_is_json_ready() -> None:
+    """numpy floats become plain floats; the k kept is written."""
+    report = k_report({2: np.float64(0.6), 3: 0.5}, k=3)
+    assert json.loads(json.dumps(report)) == report
+    assert report["k"] == 3
+    assert report["scores"] == [
+        {"k": 2, "silhouette": 0.6},
+        {"k": 3, "silhouette": 0.5},
+    ]

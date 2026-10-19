@@ -1,4 +1,8 @@
-"""Small outputs for the API: outputs/products.parquet and outputs/stats.json."""
+"""Small outputs for the API.
+
+outputs/products.parquet, outputs/stats.json, outputs/monthly_sales.parquet,
+outputs/segment_top_products.parquet
+"""
 
 import json
 from pathlib import Path
@@ -11,10 +15,18 @@ RAW_PARQUET = ROOT / "data" / "interim" / "raw.parquet"
 CLEAN_PARQUET = ROOT / "data" / "interim" / "clean.parquet"
 METRICS_JSON = ROOT / "data" / "interim" / "repurchase_metrics.json"
 RULES_PARQUET = ROOT / "outputs" / "rules.parquet"
+SEGMENTS_PARQUET = ROOT / "outputs" / "segments.parquet"
 PRODUCTS_PARQUET = ROOT / "outputs" / "products.parquet"
 STATS_JSON = ROOT / "outputs" / "stats.json"
+MONTHLY_PARQUET = ROOT / "outputs" / "monthly_sales.parquet"
+TOP_PRODUCTS_PARQUET = ROOT / "outputs" / "segment_top_products.parquet"
 COLUMNS = ["invoice", "stock_code", "description", "invoice_date", "customer_id"]
+COLUMNS += ["quantity", "price"]
 PRODUCT_COLUMNS = ["stock_code", "description", "n_invoices", "in_rules"]
+TOP_COLUMNS = ["segment", "rank", "stock_code", "description"]
+TOP_COLUMNS += ["customer_share", "preference"]
+TOP_PRODUCTS = 5  # per segment
+MIN_CUSTOMER_SHARE = 0.05  # bought by at least 5 % of the segment's customers
 
 
 def most_frequent_description(clean: pd.DataFrame) -> pd.Series:
@@ -64,11 +76,74 @@ def build_stats(
     }
 
 
+def build_monthly_sales(clean: pd.DataFrame) -> pd.DataFrame:
+    """Revenue, invoices and known customers per month; partial months flagged."""
+    sales = clean.assign(
+        month=clean["invoice_date"].dt.to_period("M"),
+        amount=clean["quantity"] * clean["price"],
+    )
+    monthly = sales.groupby("month").agg(
+        revenue=("amount", "sum"),  # all invoices, unknown customers included
+        n_invoices=("invoice", "nunique"),
+        n_customers=("customer_id", "nunique"),  # NaN not counted
+    )
+    first, last = clean["invoice_date"].min(), clean["invoice_date"].max()
+    monthly["complete"] = True
+    if first.day != 1:
+        monthly.loc[first.to_period("M"), "complete"] = False
+    if not last.is_month_end:  # data stops before the end of the last month
+        monthly.loc[last.to_period("M"), "complete"] = False
+    monthly.index = monthly.index.astype(str)  # Period("2011-12") -> "2011-12"
+    return monthly.reset_index()
+
+
+def build_segment_top_products(
+    clean: pd.DataFrame,
+    segments: pd.DataFrame,
+    names: pd.Series,
+    min_share: float = MIN_CUSTOMER_SHARE,
+    top: int = TOP_PRODUCTS,
+) -> pd.DataFrame:
+    """Products each segment prefers: lift of the product inside the segment."""
+    pairs = (
+        clean.dropna(subset=["customer_id"])
+        .astype({"customer_id": "int64"})[["customer_id", "stock_code"]]
+        .drop_duplicates()  # one row per customer and product
+        .merge(segments[["customer_id", "segment"]], on="customer_id")
+    )
+    overall = pairs["stock_code"].value_counts(normalize=True)
+    sizes = pairs.groupby("segment")["customer_id"].nunique()
+    tables = []
+    for segment, group in pairs.groupby("segment"):
+        counts = group["stock_code"].value_counts()  # customers who bought it
+        table = pd.DataFrame(
+            {
+                "customer_share": counts / sizes[segment],
+                # share of the segment's purchases / share of all purchases
+                "preference": counts / len(group) / overall[counts.index],
+            }
+        ).rename_axis("stock_code")
+        table = table[table["customer_share"] >= min_share].reset_index()
+        table = table.sort_values(
+            ["preference", "stock_code"], ascending=[False, True]
+        ).head(top)
+        tables.append(table.assign(segment=segment, rank=range(1, len(table) + 1)))
+    best = pd.concat(tables, ignore_index=True)
+    best["description"] = best["stock_code"].map(names)
+    return best.astype({"segment": "int64"})[TOP_COLUMNS]
+
+
 def main() -> None:
-    """Write products.parquet and stats.json, then read them back."""
+    """Write the small outputs, then read them back."""
     clean = pd.read_parquet(CLEAN_PARQUET, columns=COLUMNS)
     rules = pd.read_parquet(RULES_PARQUET)
-    build_products(clean, rules).to_parquet(PRODUCTS_PARQUET, index=False)
+    products = build_products(clean, rules)
+    products.to_parquet(PRODUCTS_PARQUET, index=False)
+    build_monthly_sales(clean).to_parquet(MONTHLY_PARQUET, index=False)
+    segments = pd.read_parquet(SEGMENTS_PARQUET, columns=["customer_id", "segment"])
+    names = products.set_index("stock_code")["description"]
+    top = build_segment_top_products(clean, segments.astype("int64"), names)
+    top.to_parquet(TOP_PRODUCTS_PARQUET, index=False)
     raw_rows = pq.read_metadata(RAW_PARQUET).num_rows  # no need to load the rows
     model = json.loads(METRICS_JSON.read_text())
     stats = build_stats(raw_rows, clean, rules, model)
@@ -79,6 +154,12 @@ def main() -> None:
     print(products.head(3).to_string(index=False))
     print(f"Wrote {STATS_JSON.relative_to(ROOT)}")
     print(STATS_JSON.read_text())
+    monthly = pd.read_parquet(MONTHLY_PARQUET)
+    print(f"Wrote {MONTHLY_PARQUET.relative_to(ROOT)}: {len(monthly)} months")
+    print(monthly[~monthly["complete"]].to_string(index=False))
+    top = pd.read_parquet(TOP_PRODUCTS_PARQUET)
+    print(f"Wrote {TOP_PRODUCTS_PARQUET.relative_to(ROOT)}: {len(top)} rows")
+    print(top.round(3).to_string(index=False))
 
 
 if __name__ == "__main__":
