@@ -1,26 +1,17 @@
-"""Smoke test: start a local Spark session and show 5 rows."""
+"""Smoke test: start a local Spark session and show 5 rows.
+
+Run from the repository root: python -m scripts.check_spark
+"""
 
 import pandas as pd
 import pyspark
-from pyspark.sql import SparkSession
 
-MASTER = "local[2]"  # 2 cores: WSL has ~3.8 GiB of RAM
-SHUFFLE_PARTITIONS = "4"  # default 200 is far too many for one machine
-
-
-def build_spark() -> SparkSession:
-    """Create a small local Spark session (decision C4)."""
-    return (
-        SparkSession.builder.master(MASTER)
-        .appName("check-spark")
-        .config("spark.sql.shuffle.partitions", SHUFFLE_PARTITIONS)
-        .getOrCreate()
-    )
+from pipeline.spark_session import build_spark
 
 
 def main() -> None:
     """Print versions, show 5 rows, then convert them to pandas."""
-    spark = build_spark()
+    spark = build_spark("check-spark")
     print(f"pyspark {pyspark.__version__} | pandas {pd.__version__}")
     print(f"Spark (JVM) {spark.version} | master {spark.sparkContext.master}")
     df = spark.range(5)

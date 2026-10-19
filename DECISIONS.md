@@ -62,3 +62,36 @@ One entry per decision: context, options, choice, why.
 ### D01-5 Test configuration in `pyproject.toml`
 - **Context:** the `pytest` command does not add the repository root to the import path, so `import pipeline` fails.
 - **Choice:** `[tool.pytest.ini_options] pythonpath = ["."]`, rather than an empty `conftest.py` that works by side effect.
+
+## Step 2 — Cleaning with PySpark
+
+### D02-1 Measure the raw data before writing cleaning rules
+- **Context:** the planned rules were: drop "C" invoices, `Quantity <= 0`, `Price <= 0`.
+- **Example:** invoice `A563185` ("Adjust bad debt", code `B`) has a **positive** price (+11,062.06): none of the planned rules removes it. Only 6 "A" invoices exist; 5 have a negative price.
+- **Choice:** profile invoice prefixes and non-standard stock codes first, then decide the rules.
+- **Why:** a rule written from assumptions would have let an accounting line enter the baskets as a "product".
+
+### D02-2 Explicit list of non-product codes
+- **Context:** 62 stock codes do not start with 5 digits (6,093 rows): postage, manual entries, fees, adjustments, tests, gift vouchers, but also real products (`DCGS...`, `PADS`, `SP1002`).
+- **Options:** drop every code not starting with 5 digits; an explicit list.
+- **Choice:** an explicit list of 25 codes (exact match), including gift vouchers. `DCGS...`, `PADS` and `SP1002` are kept.
+- **Why:** a pattern would drop real products. Each excluded code can be justified. Removed: 4,649 rows.
+
+### D02-3 Normalize stock codes before filtering
+- **Context:** `upper(trim())` changes 3,472 rows (184 codes): 3,471 by case (`85123a`), 1 by a trailing space. 173 product codes merge into their upper-case twin.
+- **Choice:** `normalize_stock_code()` runs first; the non-product list is written in upper case (`m` becomes `M` and is excluded).
+- **Why:** without it, one product would be split into two codes in the association rules.
+
+### D02-4 Remove exact duplicates
+- **Context:** 34,335 exact duplicate rows in the raw data (3.2 %); 33,664 remain after the other rules and normalization.
+- **Choice:** `dropDuplicates()` on all columns, after normalization.
+- **Why:** duplicates inflate `monetary` in RFM. Baskets are not affected (`collect_set`), so removing them costs nothing.
+
+### D02-5 Integer customer id, missing ids kept
+- **Context:** all 5,852 customer ids are whole numbers (12346 to 18287); 226,761 clean rows have no id.
+- **Choice:** cast to `int`; missing ids stay null.
+- **Why:** rows without a customer still describe a basket. They are excluded only from RFM and repurchase.
+
+### D02-6 Spark result checked against pandas
+- **Choice:** the same rules computed with pandas give the reference count; Spark must match it exactly.
+- **Result:** 1,003,357 rows on both sides, with the same count removed by each rule.
