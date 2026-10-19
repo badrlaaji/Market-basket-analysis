@@ -657,10 +657,7 @@ button:disabled {
 
 @media (max-width: 52rem) {
   .basket-layout,
-  .segments-layout,
-  .split,
-  .pair,
-  .mirror {
+  .segments-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -765,7 +762,8 @@ button:disabled {
   stroke: var(--rule);
 }
 
-.grid line {
+/* Recharts puts the className of CartesianGrid on each line, not on a group */
+.recharts-cartesian-grid line {
   stroke: var(--gridline);
 }
 
@@ -1062,15 +1060,12 @@ tr.is-selected > * {
   letter-spacing: 0;
   text-align: left;
   white-space: normal;
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity 120ms;
+  display: none; /* hidden tips must not widen the page */
 }
 
 .term:hover .term-tip,
 .term:focus .term-tip {
-  visibility: visible;
-  opacity: 1;
+  display: block;
 }
 
 /* Insights on the overview: one sentence and one action each */
@@ -1241,6 +1236,207 @@ tr.is-selected > * {
   font-variant-numeric: tabular-nums;
 }
 
+/* Segment colours: segment 0-3 = series 1-4 (adjacent pairs validated) */
+.swatch.seg-0 { background: var(--series-1); }
+.swatch.seg-1 { background: var(--series-2); }
+.swatch.seg-2 { background: var(--series-3); }
+.swatch.seg-3 { background: var(--series-4); }
+
+.segment-picker .swatch,
+.persona h2 .swatch {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.dot-context .recharts-symbols {
+  fill: var(--context);
+  fill-opacity: 0.7;
+}
+
+.dot-seg-0 .recharts-symbols { fill: var(--series-1); }
+.dot-seg-1 .recharts-symbols { fill: var(--series-2); }
+.dot-seg-2 .recharts-symbols { fill: var(--series-3); }
+.dot-seg-3 .recharts-symbols { fill: var(--series-4); }
+
+.dot-series-1 .recharts-symbols {
+  fill: var(--series-1);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.dot-series-1 .recharts-curve,
+.series-2 .recharts-line-curve {
+  fill: none;
+}
+
+.dot-series-1 .recharts-curve {
+  stroke: var(--series-1);
+  stroke-width: 2;
+}
+
+.series-2 .recharts-line-curve {
+  stroke: var(--series-2);
+}
+
+.recharts-errorBar line {
+  stroke: var(--ink-2);
+}
+
+.line-dot {
+  fill: var(--series-1);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.radar-axis text,
+.recharts-polar-angle-axis-tick-value {
+  fill: var(--ink-2);
+  font-size: 0.8125rem;
+}
+
+.radar-context .recharts-polygon {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.radar-seg-0 .recharts-polygon { fill: var(--series-1); stroke: var(--series-1); }
+.radar-seg-1 .recharts-polygon { fill: var(--series-2); stroke: var(--series-2); }
+.radar-seg-2 .recharts-polygon { fill: var(--series-3); stroke: var(--series-3); }
+.radar-seg-3 .recharts-polygon { fill: var(--series-4); stroke: var(--series-4); }
+
+[class*="radar-seg-"] .recharts-polygon {
+  fill-opacity: 0.3;
+  stroke-width: 2;
+}
+
+.recharts-polar-grid line,
+.recharts-polar-grid path {
+  stroke: var(--rule);
+}
+
+/* Persona card */
+.persona h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.persona-share {
+  margin-top: 0.4rem;
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+.persona-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0.25rem;
+}
+
+.persona-facts dt {
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.persona-facts dd {
+  margin: 0.1rem 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.persona h3 {
+  margin-top: 1.25rem;
+  font-size: var(--step-0);
+}
+
+.persona-products {
+  margin: 0.5rem 0 1.25rem;
+  padding-left: 1.25rem;
+  font-size: var(--step--1);
+}
+
+.persona-products li + li {
+  margin-top: 0.35rem;
+}
+
+.persona-products li span {
+  display: block;
+}
+
+.figure-block h2 {
+  margin-bottom: 0.75rem;
+}
+
+/* RFM grid: one hue, darker = more customers */
+.rfm-grid {
+  min-width: 36rem;
+  border-collapse: separate;
+  border-spacing: 3px;
+  background: none;
+}
+
+.rfm-grid th {
+  font-weight: 500;
+  font-size: 0.8125rem;
+  border: 0;
+  padding: 0.35rem 0.5rem;
+}
+
+.rfm-grid td {
+  border: 0;
+  border-radius: 4px;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.6rem 0.4rem;
+  background: color-mix(in oklab, var(--series-1) var(--heat), var(--surface));
+  color: var(--ink);
+}
+
+.rfm-grid td.is-dark {
+  color: #fff;
+}
+
+.rfm-grid td strong {
+  display: block;
+  font-size: var(--step-0);
+  font-variant-numeric: tabular-nums;
+}
+
+.rfm-grid td span {
+  font-size: 0.75rem;
+}
+
+/* Treemap: tinted areas, 2px surface gaps, labels in ink */
+.treemap-cell {
+  stroke: var(--surface);
+  stroke-width: 2;
+  fill-opacity: 0.4;
+}
+
+.treemap-cell.seg-0 { fill: var(--series-1); }
+.treemap-cell.seg-1 { fill: var(--series-2); }
+.treemap-cell.seg-2 { fill: var(--series-3); }
+.treemap-cell.seg-3 { fill: var(--series-4); }
+
+.treemap-label {
+  fill: var(--ink);
+  font-size: 0.8125rem;
+}
+
+/* The honest note of the model page */
+.callout {
+  max-width: 52rem;
+  margin: 0 0 2rem;
+  padding: 0.9rem 1.1rem;
+  border-left: 3px solid var(--series-2);
+  background: var(--surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--ink-2);
+}
+
 .tab-panel select {
   max-width: 32rem;
 }
@@ -1265,6 +1461,25 @@ tr.is-selected > * {
 @keyframes pulse {
   to {
     opacity: 0.5;
+  }
+}
+
+/* Scroll containers hold their absolute children (visually hidden captions, labels) */
+.table-wrap,
+.scroll-x {
+  position: relative;
+}
+
+/* After the step 7b grids: a later rule of equal weight would undo this one */
+@media (max-width: 52rem) {
+  .split,
+  .pair,
+  .mirror {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .counters dd {
+    font-size: var(--step-2);
   }
 }
 

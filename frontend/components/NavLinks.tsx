@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/basket", label: "Basket" },
   { href: "/segments", label: "Segments" },
   { href: "/win-back", label: "Win-back" },
+  { href: "/model", label: "Model" },
 ];
 
 /** Main navigation; the current page gets aria-current. */
