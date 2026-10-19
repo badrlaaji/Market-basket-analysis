@@ -44,7 +44,7 @@ function MonthTooltip({ active, payload }: TooltipContentProps) {
       {point.label}
       {point.complete ? "" : " (partial month)"}
       <br />
-      {formatInt(point.n_invoices)} invoices, {formatInt(point.n_customers)} identified customers
+      {formatInt(point.n_invoices)} orders, {formatInt(point.n_customers)} known customers
     </div>
   );
 }
@@ -59,7 +59,7 @@ export default function RevenueChart({ months }: { months: Month[] }) {
       responsive
       style={{ width: "100%", height: 320 }}
       data={points}
-      margin={{ top: 28, right: 16, bottom: 0, left: 8 }}
+      margin={{ top: 28, right: 36, bottom: 0, left: 8 }} // room for the last peak label on a phone
       accessibilityLayer
     >
       <CartesianGrid vertical={false} className="grid" />

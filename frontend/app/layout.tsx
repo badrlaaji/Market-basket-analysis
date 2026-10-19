@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import NavLinks from "@/components/NavLinks";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Market Basket Analysis",
+  title: "Gift Shop Insights",
   description:
-    "Association rules, customer segments and repurchase scores for a UK online gift retailer.",
+    "What sells together, who the customers are and who may stop buying, for a UK online gift shop.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -16,7 +17,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="site-header">
           <nav className="site-header-inner" aria-label="Main">
             <Link href="/" className="brand">
-              Market Basket Analysis
+              <Logo />
+              Gift Shop Insights
             </Link>
             <NavLinks />
           </nav>
@@ -24,8 +26,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         <footer className="site-footer">
           <p>
-            Data: Online Retail II, UCI Machine Learning Repository (CC BY 4.0). Customers
-            are shown by their numeric ID only.
+            Two years of orders from a UK online gift shop: the Online Retail II dataset, UCI
+            Machine Learning Repository (CC BY 4.0). Customers appear only as a number.
           </p>
         </footer>
       </body>

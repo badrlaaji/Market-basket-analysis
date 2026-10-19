@@ -97,7 +97,7 @@ export default function RulesScatter({
         ticks={[0.01, 0.015, 0.02, 0.03, 0.04]}
         tickFormatter={(value: number) => formatPercent(value)}
         label={{
-          value: "Support: share of all invoices (log scale)",
+          value: "Support: share of all orders (log scale)",
           position: "insideBottom",
           offset: -16,
         }}

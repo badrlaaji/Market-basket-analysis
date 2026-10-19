@@ -78,7 +78,7 @@ function FlowLink(props: SankeyLinkProps) {
       className="sankey-link"
     >
       <title>
-        {source.name} → {target.name}: {formatPercent(props.payload.value)} of invoices
+        {source.name} → {target.name}: {formatPercent(props.payload.value)} of orders
       </title>
     </path>
   );
@@ -96,7 +96,7 @@ export default function RuleFlows({ rules }: { rules: Rule[] }) {
     <>
       <p className="note status">
         The first {shown.length} pairs of the table (A → B and B → A count once), in the
-        table order. Width: share of invoices with the whole set.
+        table order. Width: share of orders with the whole set.
       </p>
       <div className="scroll-x">
         <div className="sankey-frame">

@@ -1,6 +1,7 @@
-"use client"; // the selected segment drives the scatter, the radar and the persona card
+"use client"; // the selected group drives the persona card and the analyst charts
 
 import { useState } from "react";
+import AnalystDetails from "@/components/AnalystDetails";
 import MigrationFlows from "@/components/MigrationFlows";
 import PersonaCard from "@/components/PersonaCard";
 import RevenueTreemap from "@/components/RevenueTreemap";
@@ -15,7 +16,7 @@ import { formatInt } from "@/lib/format";
 import { topRevenueSegment } from "@/lib/insights";
 import type { GridCell, KReport, MapPoint, SegmentProfile, Transitions } from "@/lib/types";
 
-/** Segment picker, three main charts, the persona card and the detail tabs. */
+/** Group picker, share of customers against spending, the persona card, then analyst tabs. */
 export default function SegmentsView({
   profiles,
   points,
@@ -34,7 +35,7 @@ export default function SegmentsView({
 
   return (
     <>
-      <div className="segment-picker" role="group" aria-label="Choose a segment">
+      <div className="segment-picker" role="group" aria-label="Choose a group">
         {profiles.map((p) => (
           <button
             key={p.segment}
@@ -48,14 +49,12 @@ export default function SegmentsView({
       </div>
 
       <div className="split">
-        <section className="panel chart-panel" aria-labelledby="map-title">
-          <h2 id="map-title">
-            Where the {selected.segment_name} sit: <Term id="recency">recency</Term> and{" "}
-            <Term id="frequency">frequency</Term>
-          </h2>
-          <SegmentScatter points={points} selected={selected} />
+        <section className="panel chart-panel" aria-labelledby="share-title">
+          <h2 id="share-title">Share of the customers, share of the spending</h2>
+          <ShareBars profiles={profiles} />
           <p className="note">
-            A sample of {formatInt(points.length)} customers, each segment keeping its share.
+            Read each pair of bars: a group with a short grey bar and a long coloured bar
+            brings much more than its size.
           </p>
         </section>
         <aside className="panel">
@@ -63,42 +62,60 @@ export default function SegmentsView({
         </aside>
       </div>
 
-      <div className="pair section">
-        <section aria-labelledby="share-title" className="figure-block">
-          <h2 id="share-title">Customers against revenue</h2>
-          <ShareBars profiles={profiles} />
-        </section>
-        <section aria-labelledby="radar-title" className="figure-block">
-          <h2 id="radar-title">
-            Profile of the {selected.segment_name} (<Term id="percentile">percentile</Term>)
-          </h2>
-          <SegmentRadar profiles={profiles} selected={selected} />
-          <p className="note">Filled: {selected.segment_name}. Outlines: the other segments.</p>
-        </section>
-      </div>
-
-      <section className="section" aria-labelledby="segment-details">
-        <h2 id="segment-details">Look closer</h2>
+      <AnalystDetails>
         <Tabs
-          label="Segment details"
+          label="Group details"
           tabs={[
+            {
+              id: "map",
+              label: "Where customers sit",
+              content: (
+                <>
+                  <h3 className="tab-title">
+                    The {selected.segment_name} by <Term id="recency">last order</Term> and{" "}
+                    <Term id="frequency">number of orders</Term>
+                  </h3>
+                  <SegmentScatter points={points} selected={selected} />
+                  <p className="note">
+                    A sample of {formatInt(points.length)} customers, each group keeping its
+                    share.
+                  </p>
+                </>
+              ),
+            },
+            {
+              id: "radar",
+              label: "Group profile",
+              content: (
+                <>
+                  <h3 className="tab-title">
+                    The {selected.segment_name} against all customers (
+                    <Term id="percentile">rank</Term>)
+                  </h3>
+                  <SegmentRadar profiles={profiles} selected={selected} />
+                  <p className="note">
+                    Filled: {selected.segment_name}. Outlines: the other groups.
+                  </p>
+                </>
+              ),
+            },
             { id: "grid", label: "RFM grid", content: <RfmGrid cells={cells} profiles={profiles} /> },
-            { id: "treemap", label: "Revenue map", content: <RevenueTreemap profiles={profiles} /> },
+            { id: "treemap", label: "Spending map", content: <RevenueTreemap profiles={profiles} /> },
             {
               id: "migration",
-              label: "Migration in 90 days",
+              label: "Moves in 90 days",
               content: (
                 <MigrationFlows transitions={transitions} profiles={profiles} focus={selected} />
               ),
             },
             {
               id: "k",
-              label: "Choosing the number of segments",
+              label: `Why ${kReport.k} groups`,
               content: <SilhouetteChart report={kReport} />,
             },
           ]}
         />
-      </section>
+      </AnalystDetails>
     </>
   );
 }

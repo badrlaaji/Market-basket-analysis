@@ -40,7 +40,7 @@ export default function RevenueTreemap({ profiles }: { profiles: SegmentProfile[
   return (
     <>
       <p className="note status">
-        Area = revenue. Each segment is split by the number of invoices of its customers.
+        Area = spending. Each group is split by the number of orders of its customers.
       </p>
       <ResponsiveContainer width="100%" height={360}>
         <Treemap
@@ -53,7 +53,7 @@ export default function RevenueTreemap({ profiles }: { profiles: SegmentProfile[
           <Tooltip
             formatter={(value, _name, item) => [
               formatPounds(Number(value)),
-              `${(item.payload as { segment_name: string }).segment_name}, ${(item.payload as { name: string }).name} invoices`,
+              `${(item.payload as { segment_name: string }).segment_name}, ${(item.payload as { name: string }).name} orders`,
             ]}
           />
         </Treemap>

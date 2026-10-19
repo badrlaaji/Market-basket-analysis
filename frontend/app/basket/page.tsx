@@ -11,23 +11,26 @@ export default async function BasketPage() {
     fetchApi<Scenario[]>("/scenarios"),
     fetchApi<Stats>("/stats"),
   ]);
-  const best = scenarios[0];
 
   return (
     <main>
       <header className="page-head">
         <h1 className="question">What else goes in this basket?</h1>
         <p className="answer">
-          {formatInt(stats.products_in_rules)} of the {formatInt(stats.products)} products can
-          trigger a suggestion
-          {best ? `, and the richest pair of products starts ${formatInt(best.n_rules)} rules.` : "."}
+          Fill a basket and see what other customers usually add to it.
         </p>
         <p className="lede">
-          Add products and see what other customers bought with them, ranked by lift. Only
-          rules fully contained in your basket are used.
+          Suggestions come from the buying patterns of {formatInt(stats.invoices)} orders.{" "}
+          {formatInt(stats.products_in_rules)} of the {formatInt(stats.products)} products can
+          lead to one; the others appear in too few orders to show a clear pattern.
         </p>
       </header>
-      <BasketBuilder popular={popular} scenarios={scenarios} />
+      <BasketBuilder
+        popular={popular}
+        scenarios={scenarios}
+        patterns={stats.rules}
+        orders={stats.invoices}
+      />
     </main>
   );
 }

@@ -20,7 +20,7 @@ function CustomerTooltip({ active, payload }: TooltipContentProps) {
   return (
     <div className="chart-tooltip">
       <strong>{formatPounds(point.monetary)}</strong>
-      {formatInt(point.frequency)} invoices, last one {formatInt(point.recency)} days before the
+      {formatInt(point.frequency)} orders, last one {formatInt(point.recency)} days before the
       end of the data
     </div>
   );
@@ -51,19 +51,19 @@ export default function SegmentScatter({
         <XAxis
           type="number"
           dataKey="recency"
-          name="Days since last purchase"
+          name="Days since last order"
           domain={[0, "dataMax"]}
-          label={{ value: "Days since the last purchase", position: "insideBottom", offset: -16 }}
+          label={{ value: "Days since the last order", position: "insideBottom", offset: -16 }}
         />
         <YAxis
           type="number"
           dataKey="frequency"
-          name="Invoices"
+          name="Orders"
           scale="log"
           domain={[1, "dataMax"]}
           ticks={[1, 2, 5, 10, 20, 50, 100, 200]}
           width={60}
-          label={{ value: "Invoices (log)", angle: -90, position: "insideLeft", offset: 4 }}
+          label={{ value: "Orders (log)", angle: -90, position: "insideLeft", offset: 4 }}
         />
         <ZAxis range={[14, 14]} />
         <Tooltip content={CustomerTooltip} cursor={false} />

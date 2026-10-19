@@ -1,6 +1,7 @@
 "use client"; // the threshold slider and the segment filter update the chart and the list
 
 import { useEffect, useState } from "react";
+import AnalystDetails from "@/components/AnalystDetails";
 import ProbaHistogram from "@/components/ProbaHistogram";
 import Term from "@/components/Term";
 import { formatCompactPounds, formatInt, formatPercent, formatPounds } from "@/lib/format";
@@ -11,6 +12,8 @@ import { useDebounce } from "@/lib/useDebounce";
 type Shown = { query: string; page: AtRiskPage };
 type Bins = { query: string; bins: HistogramBin[] };
 
+const FOLDED_ROWS = 10; // rows shown before "Show all"
+
 /** GET a JSON route of Next.js; throws on an error status. */
 async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
@@ -18,7 +21,7 @@ async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-/** Histogram + live counters + customers to contact, highest net spend first. */
+/** Live counters, customers to contact (highest net spend first), histogram for analysts. */
 export default function WinBackList({
   initialThreshold,
   initialSegment,
@@ -43,6 +46,7 @@ export default function WinBackList({
     bins: initialBins,
   });
   const [error, setError] = useState("");
+  const [unfolded, setUnfolded] = useState(false);
 
   const query = useDebounce(atRiskQuery(threshold, segment));
   const binsQuery = segmentQuery(segment);
@@ -84,7 +88,7 @@ export default function WinBackList({
         <label className="field">
           <span className="field-label">
             <span>
-              <Term id="probability">Chance of buying again</Term> below
+              <Term id="probability">Chance of ordering again</Term>, below
             </span>
             <output>{formatPercent(threshold, 0)}</output>
           </span>
@@ -98,12 +102,12 @@ export default function WinBackList({
           />
         </label>
         <label className="field">
-          Segment
+          Customer group
           <select
             value={segment ?? ""}
             onChange={(e) => setSegment(e.target.value === "" ? null : Number(e.target.value))}
           >
-            <option value="">All segments</option>
+            <option value="">All groups</option>
             {profiles.map((p) => (
               <option key={p.segment} value={p.segment}>
                 {p.segment_name}
@@ -115,38 +119,24 @@ export default function WinBackList({
 
       <dl className={loading ? "counters is-loading" : "counters"} aria-live="polite">
         <div>
-          <dt>{scope} below the threshold</dt>
+          <dt>{scope} to contact</dt>
           <dd>{formatInt(total)}</dd>
         </div>
         <div>
           <dt>
-            Their <Term id="netSpend">net spend</Term> over two years
+            What they spent in two years (<Term id="netSpend">net</Term>)
           </dt>
           <dd>{formatCompactPounds(revenue)}</dd>
         </div>
       </dl>
       {error && <p className="error-text">{error}</p>}
 
-      <section className="panel chart-panel" aria-labelledby="histogram-title">
-        <h2 id="histogram-title">
-          How likely each {segmentName ? `${segmentName} customer` : "customer"} is to order
-          again
-        </h2>
-        <div className={histogram.query === binsQuery ? undefined : "is-loading"}>
-          <ProbaHistogram bins={histogram.bins} threshold={threshold} />
-        </div>
-        <p className="note">
-          Customers per 5-point band of predicted probability. The coloured bars, left of
-          the threshold line, are the customers counted above. Probabilities run low in this
-          season, so read them as a ranking.
-        </p>
-      </section>
-
-      <section className="section" aria-labelledby="list-title">
+      <section aria-labelledby="list-title">
         <div className="section-head">
           <h2 id="list-title">Who to contact first</h2>
           <p className="note">
-            The {formatInt(customers.length)} with the highest net spend
+            The {formatInt(Math.min(customers.length, unfolded ? customers.length : FOLDED_ROWS))}{" "}
+            who spent the most
             {loading ? ", updating" : ""}.
           </p>
         </div>
@@ -157,19 +147,19 @@ export default function WinBackList({
                 <caption className="visually-hidden">Customers to win back</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Customer ID</th>
-                    <th scope="col">Segment</th>
-                    <th scope="col">Chance of buying in 90 days</th>
+                    <th scope="col">Customer number</th>
+                    <th scope="col">Group</th>
+                    <th scope="col">Chance of ordering in 90 days</th>
                     <th scope="col" className="num" title="Purchases minus cancelled products">
-                      Net spend
+                      Spent (net)
                     </th>
-                    <th scope="col" className="num" title="Purchases only, as in the segments">
-                      Gross spend
+                    <th scope="col" className="num" title="Purchases only, as in the groups">
+                      Before cancellations
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {customers.map((customer) => (
+                  {(unfolded ? customers : customers.slice(0, FOLDED_ROWS)).map((customer) => (
                     <tr key={customer.customer_id}>
                       <td className="num-id">{customer.customer_id}</td>
                       <td>{customer.segment_name}</td>
@@ -192,12 +182,34 @@ export default function WinBackList({
             </div>
           ) : (
             <p className="empty">
-              No customer is below this threshold. Move the slider to the right or pick another
-              segment.
+              No customer is below this chance. Move the slider to the right or pick another
+              group.
             </p>
           )}
         </div>
+        {!unfolded && customers.length > FOLDED_ROWS && (
+          <p className="more">
+            <button type="button" onClick={() => setUnfolded(true)}>
+              Show all {formatInt(customers.length)} customers
+            </button>
+          </p>
+        )}
       </section>
+
+      <AnalystDetails>
+        <h3 className="tab-title">
+          How likely each {segmentName ? `${segmentName} customer` : "customer"} is to order
+          again
+        </h3>
+        <div className={histogram.query === binsQuery ? undefined : "is-loading"}>
+          <ProbaHistogram bins={histogram.bins} threshold={threshold} />
+        </div>
+        <p className="note">
+          Customers per band of 5 points of <Term id="probability">chance</Term>. The coloured
+          bars, left of the line, are the customers counted above. The chances run low in this
+          season, so read them as a ranking.
+        </p>
+      </AnalystDetails>
     </>
   );
 }

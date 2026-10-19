@@ -24,18 +24,18 @@ export default function RfmGrid({
   return (
     <>
       <p className="note status">
-        Columns: fifths of the customers by days since their last purchase. Rows: number of
-        invoices, in fixed bands ({formatPercent(single / total, 0)} of customers have a single
-        invoice, so equal fifths are impossible). Darker = more customers; the name is the main segment of the cell.
+        Columns: fifths of the customers by days since their last order. Rows: number of
+        orders, in fixed bands ({formatPercent(single / total, 0)} of customers have a single
+        order, so equal fifths are impossible). Darker = more customers; the name is the main group of the cell.
       </p>
       <div className="scroll-x">
         <table className="rfm-grid">
           <caption className="visually-hidden">
-            Customers per recency fifth and number of invoices
+            Customers per recency fifth and number of orders
           </caption>
           <thead>
             <tr>
-              <th scope="col">Invoices</th>
+              <th scope="col">Orders</th>
               {quintiles.map((q) => {
                 const first = cell(bands[0], q);
                 return (

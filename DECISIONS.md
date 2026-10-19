@@ -352,3 +352,26 @@ One entry per decision: context, options, choice, why.
 ### D07b-11 Known issues (to review)
 - `run_all` takes 5 min 42 s (4 min 24 s at step 5). The steps timed by MLflow did not grow much (rules 72 s, segments 59 s, repurchase 9 s); the difference sits in the untimed steps (Excel ingestion, cleaning) and was not investigated.
 - The Sankey of the strongest rules mostly shows isolated pairs (data, D07b-5). On a phone, the wide charts and tables scroll inside their frame.
+
+## Step 7c — Interface for non-specialists
+
+### D07c-1 Plain words and one piece of advice per page
+- **Context:** the pages answered business questions but kept analyst words (rule, support, confidence, lift, segment, RFM, PR-AUC) and showed every chart at once.
+- **Choice (validated):** menu named by questions (Summary, Bought together, Basket helper, Customer groups, Win back, Score reliability); "pattern", "how often", "strength", "group", "order", "chance of ordering again"; one "What to do" box per page. The interface stays in English (C10); the glossary keeps the exact definitions on hover.
+- **Rejected:** a French interface (C10), removing the technical words entirely (analysts and recruiters look for them).
+
+### D07c-2 Technical charts behind "More detail for analysts"
+- **Choice:** a closed `<details>` block per page holds the rule scatter, flows and distributions, the recency × frequency scatter, radar, RFM grid, treemap, migration, silhouette, the probability histogram, the PR/ROC curves and the calibration. Its content is rendered only once opened, so the charts measure a visible box.
+- **Rejected:** deleting them (they are the evidence behind each answer).
+
+### D07c-3 Visual identity taken from the shop, data colours unchanged
+- **Choice:** shopfront green for the structure, one Retrospot red for the main action of a block, a book serif from the system (Palatino Linotype, Georgia as fallback) for answers and big numbers, the basket drawn as a till receipt (CSS mask with two zigzag edges), a polka-dot bag logo. Light and dark tokens.
+- **Kept:** the data colours validated for colour blindness (D07b-6), no web font (C9), no new dependency.
+
+### D07c-4 Model page: who came back per tenth of the score
+- **Choice:** the main chart shows, for each tenth of the test customers ranked by score, the share who ordered again (the calibration bins of `model_report.json`, no new output), with the average as a line. The answer sentence uses the top tenth: 93 % against 44 % for all customers. PR/ROC and calibration move to the analyst block.
+- **Why:** "9 out of 10 of the best-scored customers came back" needs no definition; an area under a curve does.
+
+### D07c-5 Screenshots from the production build
+- **Measured:** opened from Windows at `127.0.0.1:3000`, `next dev` refused its hot-reload websocket and the page never became interactive (a click did nothing). The Next.js docs (`allowedDevOrigins`) say the dev server blocks cross-origin requests to dev assets except from `localhost` and the hostname it was started with; `localhost` itself times out from Windows (IPv6, step 7 demo).
+- **Choice:** checks and screenshots run on the standalone build. The browser script now stops only the Edge processes of its own profile (the previous version could close the user's Edge tabs).

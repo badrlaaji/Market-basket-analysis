@@ -1,16 +1,22 @@
-/* Design tokens: cool paper, slate ink, one ledger-blue accent. */
+/* Design tokens: a gift shop. Shopfront green for the structure,
+   one Retrospot red for the main actions. Data colours are separate (validated). */
 :root {
-  --bg: #f3f5f8;
+  --bg: #f4f6f3;
   --surface: #ffffff;
-  --ink: #18212e;
-  --ink-2: #455163;
-  --muted: #667284;
-  --rule: #dbe0e7;
-  --accent: #2348a6;
-  --accent-soft: #8fa3d6;
-  --accent-wash: #e8edf8;
+  --ink: #1a2420;
+  --ink-2: #43514b;
+  --muted: #5f6d67;
+  --rule: #d8dfdb;
+  --brand: #17453a; /* shopfront: header */
+  --on-brand: #f2f6f3;
+  --accent: #1d6a53; /* links, meters, selected states */
+  --accent-soft: #8cbcab;
+  --accent-wash: #e2efe8;
+  --pop: #bf3a32; /* Retrospot red: main buttons, active page, logo */
+  --on-pop: #ffffff;
+  --pop-wash: #f8e9e7;
   --loss: #9e3a2a; /* negative net spend only */
-  --focus: #2348a6;
+  --focus: #bf3a32;
 
   /* Data colours (validated: adjacent pairs, both themes). Segments 0-3 = series 1-4 */
   --series-1: #2a78d6;
@@ -26,29 +32,39 @@
   --lift-3: #1c5cab;
   --lift-4: #104281;
 
+  /* System fonts only (C9): a book serif for answers and big numbers, the UI sans for the rest */
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", P052, Georgia,
+    serif;
+  --font-receipt: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
   --step--1: 0.875rem;
   --step-0: 1rem;
   --step-1: 1.25rem;
   --step-2: 1.75rem;
-  --step-3: 2.5rem;
-  --radius: 6px;
-  --page: 70rem;
+  --step-3: 2.6rem;
+  --radius: 10px; /* panels */
+  --radius-sm: 6px; /* controls */
+  --page: 72rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #10151d;
-    --surface: #171e28;
-    --ink: #e6eaf0;
-    --ink-2: #b6bfcc;
-    --muted: #8e99a8;
-    --rule: #2b3544;
-    --accent: #7290e6;
-    --accent-soft: #4a5f96;
-    --accent-wash: #1e2943;
+    --bg: #0e1613;
+    --surface: #15201c;
+    --ink: #e4ebe7;
+    --ink-2: #b3c0ba;
+    --muted: #8d9c96;
+    --rule: #283832;
+    --brand: #0f2e26;
+    --on-brand: #e4ebe7;
+    --accent: #6cc2a3;
+    --accent-soft: #2e6b58;
+    --accent-wash: #1a2f28;
+    --pop: #ee7b70;
+    --on-pop: #1d0f0d;
+    --pop-wash: #3a201d;
     --loss: #e58b78;
-    --focus: #9db3f0;
+    --focus: #ee7b70;
 
     --series-1: #3987e5;
     --series-2: #d95926;
@@ -116,33 +132,55 @@ p {
   margin: 0;
 }
 
-/* Header and navigation */
+/* Header: the shopfront, in brand green */
 .site-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--rule);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.site-header :focus-visible {
+  outline-color: var(--on-brand); /* red on green would be too faint */
 }
 
 .site-header-inner {
   max-width: var(--page);
   margin: 0 auto;
-  padding: 0.75rem 1rem;
+  padding: 0 1rem;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem 2rem;
+  gap: 0 2rem;
 }
 
 .brand {
-  color: var(--ink);
-  font-weight: 650;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 0;
+  color: var(--on-brand);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
   text-decoration: none;
+}
+
+.brand svg {
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+
+.logo-bag {
+  fill: var(--pop);
+}
+
+.logo-dot {
+  fill: #fff;
 }
 
 .nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -150,49 +188,52 @@ p {
 
 .nav a {
   display: block;
-  padding: 0.35rem 0.7rem;
-  border-radius: var(--radius);
-  color: var(--ink-2);
+  padding: 1.05rem 0.75rem 0.95rem;
+  color: var(--on-brand);
+  opacity: 0.82;
   text-decoration: none;
+  border-bottom: 3px solid transparent;
 }
 
 .nav a:hover {
-  background: var(--accent-wash);
+  opacity: 1;
+  background: rgb(255 255 255 / 0.07);
 }
 
 .nav a[aria-current="page"] {
-  background: var(--accent-wash);
-  color: var(--accent);
+  opacity: 1;
   font-weight: 600;
+  border-bottom-color: #f08a80; /* light Retrospot red: readable on the green */
 }
 
 /* Page frame */
 main {
   max-width: var(--page);
   margin: 0 auto;
-  padding: 2.5rem 1rem 4rem;
+  padding: 2.75rem 1rem 4rem;
 }
 
 .page-head {
-  max-width: 48rem;
+  max-width: 50rem;
   margin-bottom: 2rem;
 }
 
 /* The page title is the business question; the answer below it is the hero */
 .question {
-  font-size: var(--step-1);
+  font-size: var(--step-0);
   font-weight: 600;
-  color: var(--ink-2);
+  color: var(--accent);
   letter-spacing: 0;
 }
 
 .answer {
-  margin-top: 0.5rem;
-  max-width: 36ch;
+  margin-top: 0.4rem;
+  max-width: 30ch;
+  font-family: var(--font-display);
   font-size: var(--step-3);
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.15;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.01em;
   text-wrap: balance;
 }
 
@@ -256,20 +297,21 @@ main {
 }
 
 .figures div {
-  border-top: 2px solid var(--ink);
-  padding-top: 0.5rem;
+  border-top: 3px solid var(--brand);
+  padding-top: 0.6rem;
 }
 
 .figures dt {
   color: var(--ink-2);
   font-size: var(--step--1);
+  font-weight: 600;
 }
 
 .figures dd {
   margin: 0.15rem 0 0;
+  font-family: var(--font-display);
   font-size: var(--step-2);
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-variant-numeric: lining-nums;
 }
 
 /* Model vs baseline comparison */
@@ -432,8 +474,8 @@ select {
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.7rem;
   min-width: 14rem;
 }
 
@@ -446,8 +488,8 @@ button {
   font: inherit;
   font-size: var(--step--1);
   cursor: pointer;
-  border-radius: var(--radius);
-  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.8rem;
   border: 1px solid var(--rule);
   background: var(--surface);
   color: var(--ink);
@@ -464,15 +506,20 @@ button:disabled {
   border-color: var(--rule);
 }
 
-.button-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--surface);
+/* The main action of a block: Retrospot red, one per block at most */
+.button-primary,
+.button.button-primary {
+  background: var(--pop);
+  border-color: var(--pop);
+  color: var(--on-pop);
+  font-weight: 600;
 }
 
-.button-primary:hover {
-  color: var(--surface);
-  filter: brightness(1.1);
+.button-primary:hover,
+.button.button-primary:hover {
+  color: var(--on-pop);
+  border-color: var(--pop);
+  filter: brightness(1.08);
 }
 
 /* Basket page */
@@ -709,6 +756,7 @@ button:disabled {
 
 .figures .figure-context {
   margin-top: 0.2rem;
+  font-family: var(--font);
   font-size: var(--step--1);
   font-weight: 400;
   letter-spacing: 0;
@@ -902,9 +950,9 @@ tr.is-selected > * {
 .button {
   display: inline-block;
   font-size: var(--step--1);
-  padding: 0.45rem 0.75rem;
+  padding: 0.45rem 0.8rem;
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--ink);
   text-decoration: none;
@@ -1087,36 +1135,6 @@ tr.is-selected > * {
 .term:hover .term-tip,
 .term:focus .term-tip {
   display: block;
-}
-
-/* Insights on the overview: one sentence and one action each */
-.insights {
-  display: grid;
-  gap: 1rem;
-  margin: 1rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.insight {
-  padding: 0.25rem 0 0.25rem 1rem;
-  border-left: 3px solid var(--rule);
-  max-width: 48rem;
-}
-
-.insight.series-1 { border-left-color: var(--series-1); }
-.insight.series-2 { border-left-color: var(--series-2); }
-.insight.series-3 { border-left-color: var(--series-3); }
-
-.insight p {
-  font-size: var(--step-1);
-  line-height: 1.4;
-}
-
-.insight a {
-  display: inline-block;
-  margin-top: 0.35rem;
-  font-size: var(--step--1);
 }
 
 /* "Show the numbers": the table view behind a chart */
@@ -1491,12 +1509,312 @@ tr.is-selected > * {
   position: relative;
 }
 
-/* After the step 7b grids: a later rule of equal weight would undo this one */
+/* ---------- Step 7c: plain words, one action per page, the receipt ---------- */
+
+.panel {
+  padding: 1.4rem;
+}
+
+/* "What to do": the one action of the page */
+.next-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  max-width: 50rem;
+  margin: -0.5rem 0 2.25rem;
+  padding: 1rem 1.25rem;
+  background: var(--accent-wash);
+  border-radius: var(--radius);
+}
+
+.next-step h2 {
+  font-size: var(--step--1);
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.next-step p {
+  margin-top: 0.15rem;
+  max-width: 40rem;
+}
+
+/* Overview: three questions, each with its answer and the page that explains it */
+.question-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 0 0 3rem;
+  padding: 0;
+  list-style: none;
+}
+
+.question-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-top: 4px solid var(--brand);
+  border-radius: var(--radius);
+}
+
+.question-card h2 {
+  font-size: var(--step-0);
+  color: var(--accent);
+}
+
+.question-card p {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  line-height: 1.35;
+}
+
+.lede-small {
+  margin-top: 0.75rem;
+  color: var(--ink-2);
+  max-width: 60ch;
+}
+
+/* Persona card: who the group is, in one line, then its share */
+.persona .persona-share {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-1);
+  line-height: 1.35;
+}
+
+.segment-blurb {
+  margin-top: 0.3rem;
+  color: var(--ink-2);
+  font-size: var(--step--1);
+}
+
+/* "More detail for analysts": every technical chart, closed by default */
+.analyst {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.analyst > summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--step-1);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.analyst > summary::-webkit-details-marker {
+  display: none;
+}
+
+.analyst > summary::before {
+  content: "+";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--accent-wash);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.analyst[open] > summary::before {
+  content: "−";
+}
+
+.analyst > summary span {
+  font-size: var(--step--1);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.analyst-body {
+  margin-top: 1.5rem;
+}
+
+.tab-title {
+  margin-bottom: 0.75rem;
+  font-size: var(--step-0);
+}
+
+/* The honest note of the model page now sits under the charts */
+.callout {
+  margin: 2rem 0 0;
+}
+
+/* Win-back counters in the same book serif as the other big numbers */
+.counters dd {
+  font-family: var(--font-display);
+  font-weight: 400;
+}
+
+/* Basket helper: the basket is a till receipt with a torn edge */
+.receipt-wrap {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.06)) drop-shadow(0 8px 18px rgb(23 69 58 / 0.12));
+}
+
+.receipt {
+  --tooth: 14px; /* width of one tooth of the torn edge */
+  background: var(--surface);
+  padding: 1.75rem 1.5rem 2rem;
+  /* Two zigzag edges: one cone per tooth at the top, one at the bottom */
+  mask:
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--tooth)
+      51% repeat-x,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom /
+      var(--tooth) 51% repeat-x;
+}
+
+.receipt-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 2px dashed var(--rule);
+}
+
+.receipt-head h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-2);
+}
+
+.receipt-head svg {
+  width: 28px;
+  height: 28px;
+}
+
+.receipt-head .receipt-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-receipt);
+  font-size: var(--step--1);
+}
+
+.receipt-lines {
+  margin: 0;
+  padding: 0.5rem 0;
+  list-style: none;
+  font-family: var(--font-receipt);
+  font-size: 0.9rem;
+}
+
+.receipt-lines li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+}
+
+.receipt-lines .code {
+  font-family: var(--font-receipt);
+}
+
+.receipt-lines button {
+  padding: 0.1rem 0.5rem;
+  font-family: var(--font);
+}
+
+.receipt-section {
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+  border-top: 2px dashed var(--rule);
+}
+
+.receipt-section > h3 {
+  font-size: var(--step-1);
+  margin-bottom: 0.25rem;
+}
+
+.receipt-foot {
+  margin-top: 1.25rem;
+  padding-top: 0.9rem;
+  border-top: 2px dashed var(--rule);
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--font-receipt);
+  font-size: 0.8125rem;
+}
+
+.receipt .empty {
+  padding: 1rem 0;
+}
+
+.suggestion {
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.suggestion:first-of-type {
+  border-top: 0;
+}
+
+.suggestion-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.suggestion h4 {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 600;
+}
+
+.suggestion p {
+  margin-top: 0.25rem;
+  color: var(--ink-2);
+  font-size: var(--step--1);
+}
+
+.strength {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+  font-size: var(--step--1);
+}
+
+.strength strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.basket-side h2 {
+  font-size: var(--step-1);
+}
+
+/* After the step 7b and 7c grids: a later rule of equal weight would undo this one */
 @media (max-width: 52rem) {
   .split,
   .pair,
-  .mirror {
+  .mirror,
+  .question-cards {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nav a {
+    padding: 0.6rem 0.55rem 0.5rem;
+  }
+
+  .brand {
+    padding-bottom: 0.25rem;
   }
 
   .counters dd {

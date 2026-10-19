@@ -3,16 +3,12 @@ import { formatPercent, productName } from "@/lib/format";
 import { ruleKey } from "@/lib/rules";
 import type { Rule } from "@/lib/types";
 
-/** One product: readable name, stock code below. */
+/** One product: readable name; the stock code shows on hover. */
 function ProductCell({ code, name }: { code: string; name: string }) {
-  return (
-    <>
-      {productName(name)} <span className="code">{code}</span>
-    </>
-  );
+  return <span title={`Code ${code}`}>{productName(name)}</span>;
 }
 
-/** Association rules as "basket → also bought", with confidence, lift and support. */
+/** Buying patterns as "basket → also has", with how often and how strong (lift). */
 export default function RulesTable({
   rules,
   caption,
@@ -30,16 +26,13 @@ export default function RulesTable({
         <caption className="visually-hidden">{caption}</caption>
         <thead>
           <tr>
-            <th scope="col">If the basket has</th>
-            <th scope="col">Customers also buy</th>
+            <th scope="col">When a basket has</th>
+            <th scope="col">It often also has</th>
             <th scope="col" title="Share of these baskets that also contain the product">
-              Confidence
+              How often
             </th>
-            <th scope="col" className="num" title="How many times more often than chance">
-              Lift
-            </th>
-            <th scope="col" className="num" title="Share of all invoices with the whole rule">
-              Support
+            <th scope="col" className="num" title="How many times more often than by chance">
+              Strength
             </th>
             {onSelect && (
               <th scope="col">
@@ -77,7 +70,6 @@ export default function RulesTable({
               <td className="num">
                 <span className="lift">{rule.lift.toFixed(1)}×</span>
               </td>
-              <td className="num">{formatPercent(rule.support)}</td>
               {onSelect && (
                 <td>
                   <button

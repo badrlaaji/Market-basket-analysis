@@ -1,7 +1,8 @@
 import { connection } from "next/server";
 import ModelCharts from "@/components/ModelCharts";
+import NextStep from "@/components/NextStep";
 import { fetchApi } from "@/lib/fastapi";
-import { formatDate, formatInt } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { modelAnswer, seasonNote } from "@/lib/insights";
 import type { ModelReport, Month } from "@/lib/types";
 
@@ -16,17 +17,26 @@ export default async function ModelPage() {
   return (
     <main>
       <header className="page-head">
-        <h1 className="question">Can we tell who will buy again?</h1>
-        <p className="answer">{modelAnswer(m)}</p>
+        <h1 className="question">Can we trust the score?</h1>
+        <p className="answer">{modelAnswer(m, report.calibration)}</p>
         <p className="lede">
-          XGBoost trained on {formatInt(m.n_train)} customers with features before{" "}
-          {formatDate(m.train_date)}, tested on {formatInt(m.n_test)} customers with features
-          before {formatDate(m.test_date)}: will each one order in the next {m.horizon_days}{" "}
-          days? The baseline ranks customers by days since their last purchase.
+          The score was built with the orders up to {formatDate(m.test_date)}, then checked
+          on the next {m.horizon_days} days, which it had never seen: did the customers it
+          ranked first really order again?
         </p>
       </header>
-      <p className="callout">{seasonNote(m, months)}</p>
-      <ModelCharts report={report} />
+      <NextStep href="/win-back" action="See who to win back">
+        Use the score to decide who to contact first. It ranks customers well, but its
+        chances are not an exact forecast.
+      </NextStep>
+      <ModelCharts
+        report={report}
+        note={
+          <p className="callout">
+            <strong>Good to know.</strong> {seasonNote(m, months)}
+          </p>
+        }
+      />
     </main>
   );
 }

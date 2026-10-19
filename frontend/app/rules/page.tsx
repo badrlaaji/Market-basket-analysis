@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import NextStep from "@/components/NextStep";
 import RulesExplorer from "@/components/RulesExplorer";
 import { fetchApi } from "@/lib/fastapi";
 import { rulesAnswer } from "@/lib/insights";
@@ -19,10 +20,14 @@ export default async function RulesPageView() {
         <h1 className="question">Which products sell together?</h1>
         {all.rules[0] && <p className="answer">{rulesAnswer(stats, all.rules[0])}</p>}
         <p className="lede">
-          Each rule reads as a sentence: when a basket has these products, it also has the
-          other one this often. Click a point to read it in plain words.
+          A buying pattern reads like a sentence: when a basket has these products, it often
+          has that one too. Click “Explain” on a row to read it in plain words.
         </p>
       </header>
+      <NextStep href="/basket" action="Try the basket helper">
+        Put the products of the strongest patterns side by side, in the shop and in the
+        “customers also bought” block of each product page.
+      </NextStep>
       <RulesExplorer
         initialFilters={DEFAULT_RULE_FILTERS}
         initialPage={page}

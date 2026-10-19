@@ -1,6 +1,6 @@
 "use client"; // the PR / ROC switch is local state; Recharts handles hover
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -17,22 +17,81 @@ import {
   YAxis,
   ZAxis,
 } from "recharts";
+import AnalystDetails from "@/components/AnalystDetails";
+import Tabs from "@/components/Tabs";
 import Term from "@/components/Term";
 import { formatInt, formatPercent } from "@/lib/format";
 import type { ModelReport } from "@/lib/types";
 
 // Names of the 7 features of ml/repurchase.py, for people
 const FEATURE_LABELS: Record<string, string> = {
-  recency: "Days since the last purchase",
-  frequency: "Number of invoices",
-  monetary: "Total spend",
-  tenure: "Days since the first purchase",
-  avg_basket: "Average invoice value",
-  n_products: "Distinct products bought",
-  invoices_90d: "Invoices in the last 90 days",
+  recency: "Days since the last order",
+  frequency: "Number of orders",
+  monetary: "Total spent",
+  tenure: "Days since the first order",
+  avg_basket: "Average order value",
+  n_products: "Different products bought",
+  invoices_90d: "Orders in the last 90 days",
 };
 
 const pct = (value: number) => formatPercent(value, 0);
+
+/** Share of customers who came back, per tenth of customers ranked by score (best first). */
+function DecileBars({ report }: { report: ModelReport }) {
+  const bins = [...report.calibration].sort((a, b) => b.proba_mean - a.proba_mean);
+  const step = 1 / bins.length;
+  const rows = bins.map((bin, i) => ({
+    label: i === 0 ? `Top ${pct(step)}` : `${Math.round(i * step * 100)}–${pct((i + 1) * step)}`,
+    rate: bin.rate,
+    n: bin.n,
+  }));
+
+  return (
+    <BarChart
+      responsive
+      style={{ width: "100%", height: 300 }}
+      data={rows}
+      margin={{ top: 24, right: 16, bottom: 24, left: 0 }}
+      barCategoryGap="18%"
+    >
+      <CartesianGrid vertical={false} className="grid" />
+      <XAxis
+        dataKey="label"
+        tickLine={false}
+        interval={0}
+        label={{
+          value: "Customers ranked by score, highest first",
+          position: "insideBottom",
+          offset: -16,
+        }}
+      />
+      <YAxis
+        domain={[0, 1]}
+        ticks={[0, 0.25, 0.5, 0.75, 1]}
+        tickFormatter={pct}
+        width={48}
+        tickLine={false}
+        axisLine={false}
+      />
+      <Tooltip
+        formatter={(value) => [pct(Number(value)), "Ordered again"]}
+        cursor={{ className: "bar-cursor" }}
+      />
+      <ReferenceLine
+        y={report.metrics.positive_rate_test}
+        className="threshold-line"
+        label={{
+          value: `All customers: ${pct(report.metrics.positive_rate_test)}`,
+          position: "insideTopRight",
+          className: "threshold-label",
+        }}
+      />
+      <Bar dataKey="rate" className="bar-series-1" isAnimationActive={false}>
+        <LabelList dataKey="rate" position="top" className="bar-label" formatter={(v) => pct(Number(v))} />
+      </Bar>
+    </BarChart>
+  );
+}
 
 /** PR or ROC curves of the model and the baseline, with the random level. */
 function Curves({ report }: { report: ModelReport }) {
@@ -146,7 +205,7 @@ function Importances({ report }: { report: ModelReport }) {
     >
       <XAxis type="number" hide domain={[0, "dataMax"]} />
       <YAxis type="category" dataKey="name" width={190} tickLine={false} axisLine={false} />
-      <Tooltip formatter={(value) => [pct(Number(value)), "Share of the gain"]} cursor={{ className: "bar-cursor" }} />
+      <Tooltip formatter={(value) => [pct(Number(value)), "Share of the help"]} cursor={{ className: "bar-cursor" }} />
       <Bar dataKey="importance" className="bar-series-1" maxBarSize={18} isAnimationActive={false}>
         <LabelList
           dataKey="importance"
@@ -210,36 +269,66 @@ function Calibration({ report }: { report: ModelReport }) {
   );
 }
 
-/** The three model charts; at most three visuals on the page. */
-export default function ModelCharts({ report }: { report: ModelReport }) {
+/** Main chart and what the score looks at, a note, then the curves and the calibration for analysts. */
+export default function ModelCharts({ report, note }: { report: ModelReport; note: ReactNode }) {
   const above = report.calibration.filter((b) => b.rate - b.ci95 > b.proba_mean).length;
+  const tested = report.calibration.reduce((sum, b) => sum + b.n, 0);
   return (
     <>
-      <div className="pair">
-        <section className="panel chart-panel" aria-labelledby="curves-title">
-          <h2 id="curves-title">
-            Finding the future buyers (<Term id="prAuc">PR-AUC</Term>,{" "}
-            <Term id="rocAuc">ROC-AUC</Term>)
-          </h2>
-          <Curves report={report} />
-        </section>
-        <section className="panel chart-panel" aria-labelledby="calibration-title">
-          <h2 id="calibration-title">
-            Are the probabilities right? (<Term id="calibration">calibration</Term>)
-          </h2>
-          <Calibration report={report} />
+      <div className="split">
+        <section className="panel chart-panel" aria-labelledby="deciles-title">
+          <h2 id="deciles-title">Who really came back, by score</h2>
+          <DecileBars report={report} />
           <p className="note">
-            Each point is a tenth of the{" "}
-            {formatInt(report.calibration.reduce((sum, b) => sum + b.n, 0))} test customers. In {above} of {report.calibration.length} tenths the real rate is above
-            the prediction, beyond the 95% interval.
+            The {formatInt(tested)} customers of the test, split into ten groups of the same
+            size. The higher the score, the more of them ordered again.
           </p>
         </section>
+        <section className="panel chart-panel" aria-labelledby="importance-title">
+          <h2 id="importance-title">What the score looks at</h2>
+          <Importances report={report} />
+          <p className="note">How much each piece of information helps the score.</p>
+        </section>
       </div>
-      <section className="section figure-block" aria-labelledby="importance-title">
-        <h2 id="importance-title">What the model looks at</h2>
-        <Importances report={report} />
-        <p className="note">Share of the total gain of the trees, per feature.</p>
-      </section>
+      {note}
+
+      <AnalystDetails>
+        <Tabs
+          label="Score details"
+          tabs={[
+            {
+              id: "curves",
+              label: "PR and ROC curves",
+              content: (
+                <>
+                  <h3 className="tab-title">
+                    Finding the future buyers (<Term id="prAuc">PR-AUC</Term>,{" "}
+                    <Term id="rocAuc">ROC-AUC</Term>) against the recency baseline
+                  </h3>
+                  <Curves report={report} />
+                </>
+              ),
+            },
+            {
+              id: "calibration",
+              label: "Calibration",
+              content: (
+                <>
+                  <h3 className="tab-title">
+                    Are the chances right? (<Term id="calibration">calibration</Term>)
+                  </h3>
+                  <Calibration report={report} />
+                  <p className="note">
+                    Each point is a tenth of the {formatInt(tested)} test customers. In {above}{" "}
+                    of {report.calibration.length} tenths the real rate is above the prediction,
+                    beyond the 95% interval.
+                  </p>
+                </>
+              ),
+            },
+          ]}
+        />
+      </AnalystDetails>
     </>
   );
 }

@@ -1,6 +1,7 @@
 "use client"; // sliders, search and sort update the charts and the table
 
 import { useEffect, useState } from "react";
+import AnalystDetails from "@/components/AnalystDetails";
 import ProductView from "@/components/ProductView";
 import RuleDistributions from "@/components/RuleDistributions";
 import RuleFlows from "@/components/RuleFlows";
@@ -22,9 +23,9 @@ const FOLDED_ROWS = 10; // rows shown before "Show all"; the flows use every loa
 type Shown = { query: string; page: RulesPage };
 
 /**
- * Filters, scatter of every rule, rule panel, table and detail tabs.
- * The table, the flows and the CSV follow the API filters; the scatter and the
- * histograms show every rule (loaded once) with the thresholds drawn on them.
+ * Filters, table of patterns with the selected one in plain words, then the
+ * analyst tabs. The table, the flows and the CSV follow the API filters; the
+ * scatter and the histograms show every rule (loaded once) with the thresholds.
  */
 export default function RulesExplorer({
   initialFilters,
@@ -84,7 +85,7 @@ export default function RulesExplorer({
     <>
       <div className="controls" role="search">
         <label className="field">
-          Product name or code
+          Find a product
           <input
             type="search"
             value={filters.product}
@@ -95,7 +96,7 @@ export default function RulesExplorer({
         <label className="field">
           <span className="field-label">
             <span>
-              Minimum <Term id="confidence">confidence</Term>
+              <Term id="confidence">How often</Term>, at least
             </span>
             <output>{Math.round(filters.minConfidence * 100)}%</output>
           </span>
@@ -111,7 +112,7 @@ export default function RulesExplorer({
         <label className="field">
           <span className="field-label">
             <span>
-              Minimum <Term id="lift">lift</Term>
+              <Term id="lift">Strength</Term>, at least
             </span>
             <output>{filters.minLift.toFixed(1)}×</output>
           </span>
@@ -130,33 +131,56 @@ export default function RulesExplorer({
             value={filters.sort}
             onChange={(e) => update({ sort: e.target.value as RuleSort })}
           >
-            <option value="lift">Lift</option>
-            <option value="confidence">Confidence</option>
-            <option value="support">Support</option>
+            <option value="lift">Strongest first</option>
+            <option value="confidence">Most frequent first</option>
+            <option value="support">Most common first</option>
           </select>
         </label>
         <a className="button" href={`/api/rules/export${rulesExportQuery(filters)}`} download>
-          Export CSV
+          Download (CSV)
         </a>
       </div>
 
       <div className="split">
-        <section className="panel chart-panel" aria-labelledby="scatter-title">
-          <h2 id="scatter-title">
-            All {formatInt(allRules.length)} rules by <Term id="support">support</Term> and
-            confidence
-          </h2>
-          <RulesScatter
-            rules={allRules}
-            minConfidence={filters.minConfidence}
-            minLift={filters.minLift}
-            selectedKey={selectedKey}
-            onSelect={setSelectedKey}
-          />
-          <LiftLegend />
-          <p className="note">
-            Bigger and darker points have a higher lift. Grey points are below the thresholds.
-          </p>
+        <section aria-labelledby="table-title">
+          <div className="section-head">
+            <h2 id="table-title">Patterns that match</h2>
+            <p className="note" aria-live="polite">
+              {error ||
+                `${formatInt(visible.length)} of ${formatInt(total)} shown${loading ? ", updating" : ""}.`}
+            </p>
+          </div>
+          <div className={loading ? "is-loading" : undefined}>
+            {rules.length > 0 ? (
+              <RulesTable
+                rules={visible}
+                caption="Buying patterns matching the filters"
+                selectedKey={selectedKey}
+                onSelect={setSelectedKey}
+              />
+            ) : (
+              <p className="empty">
+                No pattern matches. Move the sliders to the left or clear the search.
+              </p>
+            )}
+          </div>
+          {!unfolded && rules.length > FOLDED_ROWS && (
+            <p className="more">
+              <button type="button" onClick={() => setUnfolded(true)}>
+                Show all {formatInt(rules.length)} loaded patterns
+              </button>
+            </p>
+          )}
+          {unfolded && rules.length < total && filters.limit < MAX_LIMIT && (
+            <p className="more">
+              <button
+                type="button"
+                onClick={() => update({ limit: Math.min(filters.limit + PAGE_SIZE, MAX_LIMIT) })}
+              >
+                Show {PAGE_SIZE} more patterns
+              </button>
+            </p>
+          )}
         </section>
         <aside className="panel">
           <RulePanel
@@ -167,52 +191,35 @@ export default function RulesExplorer({
         </aside>
       </div>
 
-      <section className="section" aria-labelledby="table-title">
-        <div className="section-head">
-          <h2 id="table-title">Rules matching the filters</h2>
-          <p className="note" aria-live="polite">
-            {error ||
-              `Showing ${formatInt(visible.length)} of ${formatInt(total)} rules${loading ? ", updating" : ""}.`}
-          </p>
-        </div>
-        <div className={loading ? "is-loading" : undefined}>
-          {rules.length > 0 ? (
-            <RulesTable
-              rules={visible}
-              caption="Association rules matching the filters"
-              selectedKey={selectedKey}
-              onSelect={setSelectedKey}
-            />
-          ) : (
-            <p className="empty">
-              No rule matches these filters. Lower the thresholds or clear the search.
-            </p>
-          )}
-        </div>
-        {!unfolded && rules.length > FOLDED_ROWS && (
-          <p className="more">
-            <button type="button" onClick={() => setUnfolded(true)}>
-              Show all {formatInt(rules.length)} loaded rules
-            </button>
-          </p>
-        )}
-        {unfolded && rules.length < total && filters.limit < MAX_LIMIT && (
-          <p className="more">
-            <button
-              type="button"
-              onClick={() => update({ limit: Math.min(filters.limit + PAGE_SIZE, MAX_LIMIT) })}
-            >
-              Show {PAGE_SIZE} more rules
-            </button>
-          </p>
-        )}
-      </section>
-
-      <section className="section" aria-labelledby="details-title">
-        <h2 id="details-title">Look closer</h2>
+      <AnalystDetails>
         <Tabs
-          label="Rule details"
+          label="Pattern details"
           tabs={[
+            {
+              id: "map",
+              label: "Map of all patterns",
+              content: (
+                <>
+                  <h3 className="tab-title">
+                    All {formatInt(allRules.length)} patterns by <Term id="support">support</Term>{" "}
+                    and <Term id="confidence">confidence</Term>
+                  </h3>
+                  <RulesScatter
+                    rules={allRules}
+                    minConfidence={filters.minConfidence}
+                    minLift={filters.minLift}
+                    selectedKey={selectedKey}
+                    onSelect={setSelectedKey}
+                  />
+                  <LiftLegend />
+                  <p className="note">
+                    Higher = more often; further right = more common; bigger and darker =
+                    stronger (<Term id="lift">lift</Term>). Grey points are outside the filters.
+                    Click a point to explain it above.
+                  </p>
+                </>
+              ),
+            },
             { id: "flows", label: "Flows", content: <RuleFlows rules={rules} /> },
             {
               id: "product",
@@ -232,7 +239,7 @@ export default function RulesExplorer({
             },
           ]}
         />
-      </section>
+      </AnalystDetails>
     </>
   );
 }

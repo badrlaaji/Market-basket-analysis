@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, LabelList, Tooltip, XAxis, YAxis } from "
 import { formatPercent } from "@/lib/format";
 import type { SegmentProfile } from "@/lib/types";
 
-/** Share of the customers against share of the revenue, per segment. */
+/** Share of the customers against share of the spending, per group. */
 export default function ShareBars({ profiles }: { profiles: SegmentProfile[] }) {
   const rows = profiles.map((p) => ({
     name: p.segment_name,
@@ -17,11 +17,11 @@ export default function ShareBars({ profiles }: { profiles: SegmentProfile[] }) 
       <ul className="legend" aria-label="Bars">
         <li>
           <span className="swatch" aria-hidden="true" />
-          Share of customers
+          Share of the customers
         </li>
         <li>
           <span className="swatch series-1" aria-hidden="true" />
-          Share of revenue
+          Share of the spending
         </li>
       </ul>
       <BarChart
@@ -38,7 +38,7 @@ export default function ShareBars({ profiles }: { profiles: SegmentProfile[] }) 
         <Tooltip
           formatter={(value, name) => [
             formatPercent(Number(value)),
-            name === "customers" ? "Customers" : "Revenue",
+            name === "customers" ? "Customers" : "Spending",
           ]}
           cursor={{ className: "bar-cursor" }}
         />

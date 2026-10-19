@@ -4,7 +4,7 @@
 
 > **Work in progress.** Steps 0 to 9 are done: data pipeline, models, REST API, web app, Docker Compose and CI, plus a redesign of the web app where each page answers one business question. AWS deployment comes next.
 
-![Overview page: monthly revenue with the November peaks, key figures and insights](docs/img/web-overview.png)
+![Summary page: the answer in one sentence, three business questions and the monthly sales](docs/img/web-overview.png)
 
 ## Problem
 
@@ -60,7 +60,7 @@ All figures are produced by the code of this repository (see `JOURNAL.md` and `D
 | Repurchase within 90 days | Out-of-time validation: trained on features before 2011-06-12, tested on features before 2011-09-10 (5,256 customers, 43.5 % buy again). XGBoost **PR-AUC 0.770 / ROC-AUC 0.795** vs recency baseline 0.685 / 0.762. An anti-leak test checks that purchases after the reference date never change a feature. |
 | API | 16 endpoints, outputs loaded in 0.2 s, `/recommend` answers in about 9 ms (in-process test). 88 pytest tests in total. |
 | CI (GitHub Actions) | 4 parallel jobs on every push: API tests with the API dependencies only, pipeline tests with Java 21 and ruff, Next.js lint and build, build of both Docker images. About 2 minutes per run. |
-| Web app | 6 pages, one business question each, with an answer sentence generated from the data (no figure written by hand). Recharts only: scatter, Sankey, treemap, radar, histograms, calibration with error bars. Colours checked for colour blindness in light and dark themes. A scripted browser run of every page and tab: 0 console errors, every request sent to the Next.js server only, no horizontal scroll at 390 px. |
+| Web app | 6 pages, one business question each, in plain words for non-specialists: an answer sentence generated from the data (no figure written by hand), one piece of advice, technical charts kept in a closed analyst block. Recharts only: scatter, Sankey, treemap, radar, histograms, calibration with error bars. Colours checked for colour blindness in light and dark themes. A scripted browser run of every page and tab: 0 console errors, every request sent to the Next.js server only, no horizontal scroll at 390 px. |
 
 **Known limitations.** The segments use monetary values gross of cancellations; the win-back list sorts by net value instead, because ranked by gross value its first two customers had cancelled almost all of their orders. The probabilities are shifted by seasonality (mean prediction 0.32 vs 0.44 observed on the test period, the Christmas peak), so they are best used to rank customers. Only 224 of the 4,725 products appear in a rule.
 
@@ -111,26 +111,28 @@ cd frontend && npm ci && npm run dev   # terminal 2, http://localhost:3000
 
 `API_URL` (server side only) tells Next.js where FastAPI is: `http://localhost:8000` by default. Pages are server components that load their first data from FastAPI; interactive parts call the `/api/*` routes of Next.js, which forward to FastAPI. The FastAPI address never reaches the browser.
 
-| Page | Question | What you can do |
+The app is written for shop managers, not data scientists: pages are named after the question they answer, every page opens with a sentence built from the data and one "What to do" advice, and the technical charts (scatter of rules, RFM grid, silhouette, PR/ROC curves, calibration) sit in a closed "More detail for analysts" block. The look follows the shop's own products: shopfront green, one Retrospot red for the main actions, a book serif for the answers, and a basket drawn as a till receipt.
+
+| Page (menu) | Question | What you can do |
 | --- | --- | --- |
-| `/` | What do two years of orders say? | Monthly revenue with the peaks, four key figures, three insights with an action each |
-| `/rules` | Which products sell together? | Scatter of every rule (support × confidence, lift as size and colour), a plain-language reading of the clicked rule, filters, CSV export; flows, one product's rules both ways, distributions |
-| `/basket` | What else goes in this basket? | One-click example baskets, popular products, suggestions with the product that triggers them, usual rate against the rate with your basket |
-| `/segments` | Who are the customers? | Recency × frequency scatter, persona card with preferred products, customers against revenue, radar; RFM grid, revenue treemap, silhouette per k, 90-day migration |
-| `/win-back` | Who is about to stop buying? | Probability histogram with the threshold line, live counters, filter by segment, customers to contact |
-| `/model` | Can we tell who will buy again? | Precision-recall and ROC against the baseline, calibration with 95 % intervals, feature importances, the seasonal shift explained |
+| `/` Summary | What do two years of orders say? | Three questions with their answer and a link, monthly sales with the peaks, four key figures |
+| `/rules` Bought together | Which products sell together? | Filter by product, how often and strength; read the selected pattern in plain words; CSV download. Analysts: map of every rule, flows, one product's rules both ways, distributions |
+| `/basket` Basket helper | What else goes in this basket? | One-click example baskets, popular products, search; the basket as a receipt with "customers often add" and how much the basket changes the odds |
+| `/segments` Customer groups | Who are the customers? | Share of customers against share of spending, a card per group (typical customer, preferred products). Analysts: recency × frequency scatter, radar, RFM grid, spending treemap, 90-day moves, silhouette per k |
+| `/win-back` Win back | Who is about to stop buying? | Chance-of-ordering slider, filter by group, live counters, customers to contact first. Analysts: probability histogram |
+| `/model` Score reliability | Can we trust the score? | Share of customers who came back per tenth of the score, what the score looks at, the seasonal shift explained. Analysts: precision-recall and ROC against the baseline, calibration with 95 % intervals |
 
 | | |
 | --- | --- |
-| ![Rules page: scatter of every rule and the selected rule in plain words](docs/img/web-rules.png) | ![Segments page: recency × frequency scatter and persona card](docs/img/web-segments.png) |
-| ![Basket page: example basket and suggestions](docs/img/web-basket.png) | ![Model page: precision-recall curve and calibration](docs/img/web-model.png) |
-| ![Win-back page: probability histogram with the threshold](docs/img/web-win-back.png) | ![Segments page in the dark theme](docs/img/web-segments-dark.png) |
+| ![Bought together: the patterns that match and the selected one in plain words](docs/img/web-rules.png) | ![Customer groups: share of customers against spending and the group card](docs/img/web-segments.png) |
+| ![Basket helper: example baskets and the basket as a till receipt](docs/img/web-basket.png) | ![Score reliability: share of customers who came back per tenth of the score](docs/img/web-model.png) |
+| ![Win back: chance-of-ordering slider and customers to contact](docs/img/web-win-back.png) | ![Customer groups in the dark theme](docs/img/web-segments-dark.png) |
 
 Dark theme and phone width are supported:
 
-![Overview, dark theme](docs/img/web-overview-dark.png)
+![Summary page, dark theme](docs/img/web-overview-dark.png)
 
-<img src="docs/img/web-rules-mobile.png" alt="Rules page on a phone" width="260"> <img src="docs/img/web-win-back-mobile.png" alt="Win-back page on a phone" width="260">
+<img src="docs/img/web-rules-mobile.png" alt="Bought together page on a phone" width="260"> <img src="docs/img/web-win-back-mobile.png" alt="Win back page on a phone" width="260">
 
 ## Run with Docker Compose
 

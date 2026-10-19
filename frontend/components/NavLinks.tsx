@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Named by what people want to know, not by the technique behind the page
 const LINKS = [
-  { href: "/", label: "Overview" },
-  { href: "/rules", label: "Rules" },
-  { href: "/basket", label: "Basket" },
-  { href: "/segments", label: "Segments" },
-  { href: "/win-back", label: "Win-back" },
-  { href: "/model", label: "Model" },
+  { href: "/", label: "Summary" },
+  { href: "/rules", label: "Bought together" },
+  { href: "/basket", label: "Basket helper" },
+  { href: "/segments", label: "Customer groups" },
+  { href: "/win-back", label: "Win back" },
+  { href: "/model", label: "Score reliability" },
 ];
 
 /** Main navigation; the current page gets aria-current. */
