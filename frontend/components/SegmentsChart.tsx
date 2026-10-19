@@ -24,7 +24,7 @@ function SegmentTooltip({ active, payload }: TooltipContentProps) {
   return (
     <div className="chart-tooltip">
       <strong>{formatInt(profile.n_customers)} customers</strong>
-      {profile.segment_name}, {formatPercent(profile.share)} of all
+      {profile.segment_name}, {formatPercent(profile.customer_share)} of all
     </div>
   );
 }
@@ -109,7 +109,7 @@ export default function SegmentsChart({ profiles }: { profiles: SegmentProfile[]
       {profile && (
         <section className="panel" aria-live="polite" aria-labelledby="profile-title">
           <h2 id="profile-title">{profile.segment_name}</h2>
-          <p className="profile-share">{formatPercent(profile.share)}</p>
+          <p className="profile-share">{formatPercent(profile.customer_share)}</p>
           <p className="note status">
             of customers ({formatInt(profile.n_customers)} people)
           </p>

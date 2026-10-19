@@ -16,10 +16,13 @@ export async function fetchApi<T>(path: string): Promise<T> {
 async function forward(path: string, init: RequestInit): Promise<Response> {
   try {
     const response = await fetch(`${API_URL}${path}`, init);
-    return new Response(await response.text(), {
-      status: response.status,
-      headers: { "content-type": "application/json" },
+    // Keep the type FastAPI sent (JSON, or CSV for /rules/export) and its file name
+    const headers = new Headers({
+      "content-type": response.headers.get("content-type") ?? "application/json",
     });
+    const disposition = response.headers.get("content-disposition");
+    if (disposition) headers.set("content-disposition", disposition);
+    return new Response(await response.text(), { status: response.status, headers });
   } catch {
     return Response.json({ detail: "The API is not reachable." }, { status: 502 });
   }

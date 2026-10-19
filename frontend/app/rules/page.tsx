@@ -1,23 +1,34 @@
 import { connection } from "next/server";
 import RulesExplorer from "@/components/RulesExplorer";
 import { fetchApi } from "@/lib/fastapi";
-import { DEFAULT_RULE_FILTERS, rulesQuery } from "@/lib/queries";
-import type { RulesPage } from "@/lib/types";
+import { rulesAnswer } from "@/lib/insights";
+import { ALL_RULES_QUERY, DEFAULT_RULE_FILTERS, rulesQuery } from "@/lib/queries";
+import type { RulesPage, Stats } from "@/lib/types";
 
 export default async function RulesPageView() {
   await connection(); // render at request time: no FastAPI call during next build
-  const page = await fetchApi<RulesPage>(`/rules${rulesQuery(DEFAULT_RULE_FILTERS)}`);
+  const [page, all, stats] = await Promise.all([
+    fetchApi<RulesPage>(`/rules${rulesQuery(DEFAULT_RULE_FILTERS)}`),
+    fetchApi<RulesPage>(`/rules${ALL_RULES_QUERY}`),
+    fetchApi<Stats>("/stats"),
+  ]);
 
   return (
     <main>
-      <div className="page-head">
-        <h1>Which products sell together?</h1>
+      <header className="page-head">
+        <h1 className="question">Which products sell together?</h1>
+        {all.rules[0] && <p className="answer">{rulesAnswer(stats, all.rules[0])}</p>}
         <p className="lede">
           Each rule reads as a sentence: when a basket has these products, it also has the
-          other one this often. A lift of 10× means ten times more often than chance.
+          other one this often. Click a point to read it in plain words.
         </p>
-      </div>
-      <RulesExplorer initialFilters={DEFAULT_RULE_FILTERS} initialPage={page} />
+      </header>
+      <RulesExplorer
+        initialFilters={DEFAULT_RULE_FILTERS}
+        initialPage={page}
+        allRules={all.rules}
+        invoices={stats.invoices}
+      />
     </main>
   );
 }

@@ -35,6 +35,16 @@ export function rulesQuery(filters: RuleFilters): string {
   return `?${params}`;
 }
 
+/** Same filters without the limit: every matching rule goes in the CSV file. */
+export function rulesExportQuery(filters: RuleFilters): string {
+  const params = new URLSearchParams(rulesQuery(filters).slice(1));
+  params.delete("limit");
+  return `?${params}`;
+}
+
+// The /rules charts need every rule once (1,166 today; FastAPI accepts up to 2,000)
+export const ALL_RULES_QUERY = "?min_confidence=0&min_lift=0&sort=lift&limit=2000";
+
 /** Threshold → "?threshold=0.3&top=50". */
 export function atRiskQuery(threshold: number): string {
   return `?${new URLSearchParams({ threshold: String(threshold), top: String(AT_RISK_TOP) })}`;

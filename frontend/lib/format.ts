@@ -6,6 +6,15 @@ const pounds = new Intl.NumberFormat("en-GB", {
   currency: "GBP",
   maximumFractionDigits: 0,
 });
+const compactPounds = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  notation: "compact",
+  maximumFractionDigits: 2,
+});
+// Fixed names: Intl month names differ between ICU versions ("Sep" / "Sept"),
+// and the server and the browser must print the same text
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** 1003357 → "1,003,357". */
 export function formatInt(value: number): string {
@@ -26,4 +35,26 @@ export function formatPercent(value: number, digits: number = 1): string {
 export function productName(description: string): string {
   const lower = description.toLowerCase();
   return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+/** 19643862 → "£19.64M"; 1452116 → "£1.45M". */
+export function formatCompactPounds(value: number): string {
+  return compactPounds.format(value);
+}
+
+/** "2011-11" → "Nov 2011". */
+export function formatMonth(month: string): string {
+  const [year, number] = month.split("-");
+  return `${MONTHS[Number(number) - 1]} ${year}`;
+}
+
+/** "2011-12-09" → "9 Dec 2011". */
+export function formatDate(date: string): string {
+  const [year, number, day] = date.split("-");
+  return `${Number(day)} ${MONTHS[Number(number) - 1]} ${year}`;
+}
+
+/** 51.45 → "51×"; 8.47 → "8.5×". */
+export function formatLift(value: number): string {
+  return value >= 10 ? `${Math.round(value)}×` : `${value.toFixed(1)}×`;
 }

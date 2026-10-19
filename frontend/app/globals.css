@@ -12,6 +12,20 @@
   --loss: #9e3a2a; /* negative net spend only */
   --focus: #2348a6;
 
+  /* Data colours (validated: adjacent pairs, both themes). Segments 0-3 = series 1-4 */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --context: #c5ccd6; /* everything that is not the highlighted data */
+  --gridline: #e6e9ee;
+  /* Lift, low to high (ordinal ramp, one hue) */
+  --lift-0: #86b6ef;
+  --lift-1: #5598e7;
+  --lift-2: #2a78d6;
+  --lift-3: #1c5cab;
+  --lift-4: #104281;
+
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --step--1: 0.875rem;
   --step-0: 1rem;
@@ -35,6 +49,18 @@
     --accent-wash: #1e2943;
     --loss: #e58b78;
     --focus: #9db3f0;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --context: #3a4554;
+    --gridline: #232c39;
+    --lift-0: #184f95;
+    --lift-1: #256abf;
+    --lift-2: #3987e5;
+    --lift-3: #6da7ec;
+    --lift-4: #9ec5f4;
   }
 }
 
@@ -148,8 +174,31 @@ main {
 }
 
 .page-head {
-  max-width: 44rem;
+  max-width: 48rem;
   margin-bottom: 2rem;
+}
+
+/* The page title is the business question; the answer below it is the hero */
+.question {
+  font-size: var(--step-1);
+  font-weight: 600;
+  color: var(--ink-2);
+  letter-spacing: 0;
+}
+
+.answer {
+  margin-top: 0.5rem;
+  max-width: 36ch;
+  font-size: var(--step-3);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.page-head .lede {
+  font-size: var(--step-0);
+  max-width: 60ch;
 }
 
 .lede {
@@ -608,11 +657,22 @@ button:disabled {
 
 @media (max-width: 52rem) {
   .basket-layout,
-  .segments-layout {
+  .segments-layout,
+  .split,
+  .pair,
+  .mirror {
     grid-template-columns: minmax(0, 1fr);
   }
 
   h1 {
+    font-size: var(--step-2);
+  }
+
+  .question {
+    font-size: var(--step-0);
+  }
+
+  .answer {
     font-size: var(--step-2);
   }
 
@@ -640,6 +700,456 @@ button:disabled {
 
   .controls .field {
     flex: 1 1 12rem;
+  }
+}
+
+/* ---------- Step 7b: charts, tabs, glossary ---------- */
+
+/* Key figures: a context line under each number */
+.figures {
+  margin-top: 2.5rem;
+}
+
+.figures .figure-context {
+  margin-top: 0.2rem;
+  font-size: var(--step--1);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+/* Chart panels */
+.chart-panel h2 {
+  margin-bottom: 0.75rem;
+}
+
+.chart-panel .note {
+  margin-top: 0.75rem;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem 2rem;
+}
+
+.scroll-x {
+  overflow-x: auto;
+}
+
+.sankey-frame {
+  min-width: 46rem;
+}
+
+/* Recharts draws SVG: CSS fill and stroke win over its presentation attributes */
+.recharts-wrapper text {
+  font-family: var(--font);
+}
+
+.recharts-cartesian-axis-tick-value,
+.recharts-label {
+  fill: var(--ink-2);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line {
+  stroke: var(--rule);
+}
+
+.grid line {
+  stroke: var(--gridline);
+}
+
+.series-1 .recharts-line-curve,
+.series-1 .recharts-area-curve {
+  stroke: var(--series-1);
+}
+
+.series-1 .recharts-area-area {
+  fill: var(--series-1);
+  fill-opacity: 0.18;
+}
+
+.line-cursor {
+  stroke: var(--muted);
+}
+
+.peak-dot {
+  fill: var(--series-1);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.peak-label {
+  fill: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.threshold-line line,
+line.threshold-line {
+  stroke: var(--ink-2);
+  stroke-dasharray: 4 3;
+}
+
+.threshold-label {
+  fill: var(--ink-2);
+  font-size: 0.75rem;
+}
+
+.excluded-area,
+.excluded-area path {
+  fill: var(--context);
+  fill-opacity: 0.35;
+}
+
+/* Rule scatter: colour = lift class; grey = below the thresholds */
+.rule-dot {
+  stroke: var(--surface);
+  stroke-width: 1;
+  cursor: pointer;
+}
+
+.rule-dot.lift-0 { fill: var(--lift-0); }
+.rule-dot.lift-1 { fill: var(--lift-1); }
+.rule-dot.lift-2 { fill: var(--lift-2); }
+.rule-dot.lift-3 { fill: var(--lift-3); }
+.rule-dot.lift-4 { fill: var(--lift-4); }
+
+.rule-dot.is-dim {
+  fill: var(--context);
+  fill-opacity: 0.6;
+}
+
+.rule-dot.is-selected {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--context);
+}
+
+.swatch.lift-0 { background: var(--lift-0); }
+.swatch.lift-1 { background: var(--lift-1); }
+.swatch.lift-2 { background: var(--lift-2); }
+.swatch.lift-3 { background: var(--lift-3); }
+.swatch.lift-4 { background: var(--lift-4); }
+.swatch.series-1 { background: var(--series-1); }
+.swatch.series-2 { background: var(--series-2); }
+.swatch.series-3 { background: var(--series-3); }
+.swatch.series-4 { background: var(--series-4); }
+
+/* Rule panel */
+.rule-panel h2 {
+  margin-bottom: 0.75rem;
+}
+
+.rule-claim {
+  font-size: var(--step-1);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.rule-facts {
+  margin: 1rem 0 1.25rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.rule-facts dt {
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.rule-facts dd {
+  margin: 0.1rem 0 0;
+  color: var(--ink-2);
+}
+
+tr.is-selected > * {
+  background: var(--accent-wash);
+}
+
+/* A link styled as a button (the CSV download) */
+.button {
+  display: inline-block;
+  font-size: var(--step--1);
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Sankey: nodes and labels in ink, flows in the series colour */
+.sankey-node {
+  fill: var(--ink-2);
+}
+
+.sankey-label {
+  fill: var(--ink);
+  font-size: 0.8125rem;
+}
+
+.sankey-link {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-opacity: 0.35;
+}
+
+.sankey-link:hover {
+  stroke-opacity: 0.7;
+}
+
+/* Product view: two lists facing each other, bars grow away from the middle */
+.mirror {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 1.25rem;
+}
+
+.mirror-side h3 {
+  font-size: var(--step-0);
+}
+
+.mirror-side ul {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mirror-side li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6rem 5.5rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--rule);
+  font-size: var(--step--1);
+}
+
+.mirror-side.is-mirrored li {
+  grid-template-columns: 5.5rem 6rem minmax(0, 1fr);
+}
+
+.mirror-side.is-mirrored .mirror-name {
+  order: 3;
+  text-align: right;
+}
+
+.mirror-side.is-mirrored .mirror-value {
+  order: 1;
+}
+
+.mirror-side.is-mirrored .mirror-bar {
+  order: 2;
+  transform: scaleX(-1); /* grows from the right */
+}
+
+.mirror-bar {
+  height: 8px;
+  background: var(--accent-wash);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mirror-bar span {
+  display: block;
+  height: 100%;
+  background: var(--series-1);
+}
+
+.mirror-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.distribution {
+  margin: 0;
+}
+
+.distribution figcaption {
+  font-size: var(--step--1);
+  color: var(--ink-2);
+  margin-bottom: 0.5rem;
+}
+
+/* Tabs */
+.tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 1.25rem;
+}
+
+.tab-list [role="tab"] {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  padding: 0.5rem 0.75rem;
+  color: var(--ink-2);
+  font-size: var(--step-0);
+}
+
+.tab-list [role="tab"][aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Glossary: dotted underline, definition on hover or focus */
+.term {
+  position: relative;
+  text-decoration: underline dotted var(--muted);
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
+.term-tip {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  top: calc(100% + 0.35rem);
+  width: max-content;
+  max-width: 18rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: normal;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.term:hover .term-tip,
+.term:focus .term-tip {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Insights on the overview: one sentence and one action each */
+.insights {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.insight {
+  padding: 0.25rem 0 0.25rem 1rem;
+  border-left: 3px solid var(--rule);
+  max-width: 48rem;
+}
+
+.insight.series-1 { border-left-color: var(--series-1); }
+.insight.series-2 { border-left-color: var(--series-2); }
+.insight.series-3 { border-left-color: var(--series-3); }
+
+.insight p {
+  font-size: var(--step-1);
+  line-height: 1.4;
+}
+
+.insight a {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: var(--step--1);
+}
+
+/* "Show the numbers": the table view behind a chart */
+.data-table {
+  margin-top: 0.75rem;
+  font-size: var(--step--1);
+}
+
+.data-table summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.data-table .table-wrap {
+  margin-top: 0.5rem;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.tab-panel select {
+  max-width: 32rem;
+}
+
+/* Loading state (app/loading.tsx) */
+.skeleton {
+  border-radius: var(--radius);
+  background: var(--accent-wash);
+  animation: pulse 1.2s ease-in-out infinite alternate;
+}
+
+.skeleton-answer {
+  height: 6rem;
+  max-width: 36rem;
+  margin-top: 0.75rem;
+}
+
+.skeleton-chart {
+  height: 20rem;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
   }
 }
 
