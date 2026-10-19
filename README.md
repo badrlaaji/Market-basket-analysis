@@ -1,6 +1,6 @@
 # Market Basket Analysis
 
-> **Work in progress.** Steps 0 to 6 are done: data pipeline, models and REST API. The web interface comes next.
+> **Work in progress.** Steps 0 to 7 are done: data pipeline, models, REST API and web app. Docker Compose, CI and AWS deployment come next.
 
 ## Problem
 
@@ -21,7 +21,7 @@ The answers are served through a REST API and an interactive web app.
 - [x] 4. RFM segmentation with KMeans
 - [x] 5. Repurchase prediction (XGBoost vs baseline, tracked with MLflow)
 - [x] 6. REST API (FastAPI) with tests and a Docker image
-- [ ] 7. Web interface (Next.js)
+- [x] 7. Web interface (Next.js)
 - [ ] 8. Docker Compose
 - [ ] 9. CI with GitHub Actions
 - [ ] 10. Deployment on AWS (S3 + EC2)
@@ -38,8 +38,8 @@ OFFLINE   python -m pipeline.run_all            (about 4 min 30 s on a laptop, S
                                                                  └─► export ────────► products.parquet, stats.json
             experiments (thresholds, k, silhouettes, AUCs) ─► MLflow, local SQLite store
 
-ONLINE    Browser ─► Next.js (step 7) ─► FastAPI (Docker) ─► pandas DataFrames in memory
-                                         outputs loaded once at startup, no Spark / Java / XGBoost in the image
+ONLINE    Browser ─► Next.js pages + /api/* routes ─► FastAPI (Docker) ─► pandas DataFrames in memory
+                     the browser never calls FastAPI      outputs loaded once at startup, no Spark / Java / XGBoost in the image
 ```
 
 ## Results
@@ -53,6 +53,7 @@ All figures are produced by the code of this repository (see `JOURNAL.md` and `D
 | Segments (RFM + KMeans) | log1p on frequency and monetary, standardization, k = 4: Champions 1,650, Promising 2,076, At risk 869, Lost 1,257 customers. |
 | Repurchase within 90 days | Out-of-time validation: trained on features before 2011-06-12, tested on features before 2011-09-10 (5,256 customers, 43.5 % buy again). XGBoost **PR-AUC 0.770 / ROC-AUC 0.795** vs recency baseline 0.685 / 0.762. An anti-leak test checks that purchases after the reference date never change a feature. |
 | API | 7 endpoints, outputs loaded in 0.1 s, `/recommend` answers in about 9 ms (in-process test). 59 pytest tests in total. |
+| Web app | 5 pages rendered on the server at request time, 7 proxy routes. Production build in 32 s with the API stopped (no API call at build time); a scripted browser run of the rules → basket → segments → win-back flow: 0 console errors, every request sent to the Next.js server only. |
 
 **Known limitations.** The segments use monetary values gross of cancellations; the win-back list sorts by net value instead, because ranked by gross value its first two customers had cancelled almost all of their orders. The probabilities are shifted by seasonality (mean prediction 0.32 vs 0.44 observed on the test period, the Christmas peak), so they are best used to rank customers. Only 224 of the 4,725 products appear in a rule.
 
@@ -84,6 +85,25 @@ curl "http://localhost:8000/rules?limit=3"
 Parameters are validated (for example `min_confidence` and `threshold` in [0, 1], `limit` ≤ 500, at most 50 basket items); invalid values return `422`.
 
 <!-- Swagger UI screenshots: add docs/img/swagger-*.png here -->
+
+## Web app
+
+```bash
+uvicorn api.main:app                  # terminal 1, from the repository root
+cd frontend && npm ci && npm run dev   # terminal 2, http://localhost:3000
+```
+
+`API_URL` (server side only) tells Next.js where FastAPI is: `http://localhost:8000` by default. Pages are server components that load their first data from FastAPI; interactive parts call the `/api/*` routes of Next.js, which forward to FastAPI. The FastAPI address never reaches the browser.
+
+| Page | What you can do |
+| --- | --- |
+| `/` | Key figures, the five strongest rules, the model against its baseline |
+| `/rules` | Filter rules by confidence, lift and product; sort them |
+| `/basket` | Build a basket and get "customers also buy" suggestions |
+| `/segments` | Click a segment to see its RFM profile (medians and means) |
+| `/win-back` | Move the probability threshold to list customers to contact, with net and gross spend |
+
+<!-- Web app screenshots: add docs/img/web-*.png here -->
 
 ## Stack
 

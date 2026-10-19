@@ -246,3 +246,27 @@ One entry per decision: context, options, choice, why.
 - **Options:** keep the gross value as a known limitation; add a net value used by `/at-risk` only; exclude customers who cancel a lot (arbitrary threshold).
 - **Choice:** `monetary_net` in `repurchase_scores.parquet` = gross monetary + cancelled product lines of `raw.parquet`, with the ETL rules (normalized codes, the 25 non-product codes excluded, exact duplicates removed). `/at-risk` sorts by it and returns both values. Segments are unchanged (C6), and `monetary_net` is not a model feature.
 - **Result:** 2,422 customers have cancellations (−£708,584 in total; −£1,095,137 if non-product codes were kept), 3 have a negative net value. 16446 (net £2.90) moves from rank 1 to rank 3,181 of 3,198, 12346 (net £169.36) to rank 2,559. Model metrics unchanged.
+
+## Step 7 — Web interface (Next.js)
+
+### D07-1 Project created with explicit flags, versions pinned
+- **Context:** `create-next-app` 16.4.2 enables Tailwind, Cache Components and generated instruction files by default, and starts a nested Git repository.
+- **Choice:** `--ts --eslint --app --empty --no-tailwind --no-src-dir --no-react-compiler --no-cache-components --use-npm --disable-git`, with the two flags that turn the generated files off; the matching option and `output: "standalone"` in `next.config.ts`; every package pinned to its exact version (next 16.4.2, react 19.3.0, recharts 3.10.1, typescript 5.9.3, eslint 9.39.5).
+- **Why:** no dependency outside the stack, no generated file to clean, a small `server.js` (42 MB folder) for the Docker image of step 8.
+
+### D07-2 Server pages, client islands, one file that knows FastAPI
+- **Choice:** each page is an async server component: `await connection()`, then `fetchApi()` from `lib/fastapi.ts` (the only file that reads `API_URL`). The first data is passed as props to a client component (`RulesExplorer`, `BasketBuilder`, `SegmentsChart`, `WinBackList`), which calls only the `/api/*` routes. These routes forward to FastAPI with the same status (422 kept) and return 502 if FastAPI is down.
+- **Alternatives:** browser calls FastAPI directly (CORS, public API port, rejected by C9); every page as a client component (first paint empty, data fetched twice).
+- **Check:** `npm run build` with FastAPI stopped succeeds, all pages and routes are dynamic (ƒ); no `localhost:8000`, `api:8000` or `API_URL` in `.next/static` (the only "8000" matches are React bit masks such as `0x8000000`).
+
+### D07-3 Updates without stale or crossed answers
+- **Choice:** client components keep `{query, page}`: a request is sent only when the debounced query (300 ms) differs from the one on screen, and an `AbortController` cancels a reply that arrives too late. "Updating" is derived from state instead of set in the effect (ESLint `react-hooks` rule).
+- **Check:** moving both sliders at once sends one request.
+
+### D07-4 Design: sober, readable, system font
+- **Choice:** cool light background, slate ink, one ledger-blue accent, a dark theme from `prefers-color-scheme`; system font stack (no `next/font/google`, C9); plain CSS in `app/globals.css`, no Tailwind. Product names are upper case in the data and shown in sentence case, with the stock code next to them. Confidence is drawn as a 0–100 % bar; lift is a number (1.5 to 51, a bar would be crushed by a few large values).
+- **Chart:** horizontal bars (`Bar` with `shape`, since `Cell` is deprecated in Recharts 3), every value labeled, the selected segment in the accent; buttons give the same choice from the keyboard.
+
+### D07-5 Known issues (to review)
+- `npm audit`: 5 "high" alerts, all in the ESLint chain (`braces` via `eslint-config-next` → `fast-glob`), a development tool that is not shipped. `npm audit fix --force` would downgrade to Next 14: not applied.
+- Recharts depends on `react-is` 16.13.1 (allowed by its peer range); its `isFragment` does not recognize React 19 elements. No fragment is placed inside a chart; adding `react-is@19` (outside the stack) is not needed for now.
