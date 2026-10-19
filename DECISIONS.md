@@ -36,3 +36,29 @@ One entry per decision: context, options, choice, why.
 - **Context:** `/tmp` is a 2 GiB tmpfs (in RAM). Building the 450 MB PySpark source archive there failed.
 - **Choice:** `TMPDIR=~/.cache/pip-tmp pip install ...` for the first install.
 - **Why:** the disk has plenty of space. The built wheel is then cached by pip, so later installs are fast.
+
+## Step 1 — Excel to Parquet
+
+### D01-1 Read code and text columns as text
+- **Context:** `Invoice` and `StockCode` mix numbers and text (`489434`, `C489449`, `79323P`). 4 descriptions are numbers (other stock codes typed by mistake).
+- **Options:** let pandas guess types; force `str` on the columns that failed; force `str` on every text column.
+- **Choice:** `dtype={"Invoice": str, "StockCode": str, "Description": str}`.
+- **Why:** mixed columns make Parquet fail (`ArrowInvalid` or `ArrowTypeError`, both reproduced). Missing values stay missing.
+
+### D01-2 Timestamps written in microseconds
+- **Context:** pandas stores dates in nanoseconds; Spark 4.2 refuses them (`PARQUET_TYPE_ILLEGAL`, reproduced).
+- **Options:** `coerce_timestamps="us"` when writing; a Spark legacy option that reads them as integers.
+- **Choice:** write microseconds with pyarrow. Dates are minute-precise, so nothing is lost.
+
+### D01-3 Raw Parquet keeps the original columns
+- **Context:** the Parquet file is the starting point of the Spark cleaning step.
+- **Choice:** no renaming and no filtering at ingestion: only types are fixed. Renaming to snake_case happens in step 2.
+- **Why:** one job per step. Spark reads `Customer ID` (with a space) without trouble (checked: 1,067,371 rows).
+
+### D01-4 Download script
+- **Choice:** standard library only (`urllib`, `zipfile`); the zip is checked in memory, then only `online_retail_II.xlsx` is written; skipped if the file exists.
+- **Why:** no extra dependency, no path from the archive is trusted, and `python -m pipeline.run_all` can be run again safely.
+
+### D01-5 Test configuration in `pyproject.toml`
+- **Context:** the `pytest` command does not add the repository root to the import path, so `import pipeline` fails.
+- **Choice:** `[tool.pytest.ini_options] pythonpath = ["."]`, rather than an empty `conftest.py` that works by side effect.
