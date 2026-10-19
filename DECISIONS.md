@@ -286,3 +286,17 @@ One entry per decision: context, options, choice, why.
 ### D08-3 No `init: true`
 - **Context:** a process running as PID 1 may ignore `SIGTERM`, and Docker then waits 10 s before killing it.
 - **Measured:** `docker compose down` takes 2.8 s for both containers: uvicorn and the Next.js server stop on `SIGTERM`. `init` is not needed.
+
+## Step 9 — CI with GitHub Actions
+
+### D09-1 Four parallel jobs that mirror the deliverables
+- **Choice:** `api` installs `api/requirements.txt` only and runs `tests/test_api.py` (as in the image: no Spark); `pipeline` installs Java 21 and `requirements.txt`, runs `ruff format --check`, `ruff check` and the other tests; `web` runs `npm ci`, lint and the production build; `docker` builds both images through `infra/docker-compose.yml`, which also validates the compose file. No secret, no data, no `run_all`, no image pushed.
+- **Why:** each job proves one dependency list is enough on its own (22 + 37 = all 59 tests); a failing job names the broken part.
+
+### D09-2 Pinned, least-privilege workflow
+- **Choice:** actions pinned to full commit SHAs with the version in a comment (checkout v7.0.1, setup-python v7.0.0, setup-java v6.1.0, setup-node v7.1.0); `permissions: contents: read`; `persist-credentials: false`; `runs-on: ubuntu-24.04` written out; a `timeout-minutes` per job; no `${{ }}` expression in any command.
+- **Alternatives:** version tags (can be moved); action lockfiles (public preview, need an extra CLI extension); `ubuntu-26.04` (public preview).
+
+### D09-3 Built-in caches only
+- **Choice:** `cache: pip` (setup-python, one key per requirements file) and `cache: npm` (setup-node, `frontend/package-lock.json`). `actions/cache` and Docker layer caching are not used.
+- **Why:** PySpark is published as a 450 MB sdist; the pip cache keeps the wheel built on the first run (cache of 1.04 GiB for the pipeline job).

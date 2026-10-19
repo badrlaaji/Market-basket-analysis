@@ -45,3 +45,8 @@
 - **Done:** `frontend/Dockerfile` (3 stages, non-root `node` user), `frontend/.dockerignore`, `infra/docker-compose.yml` (internal API with a Python health check, web on port 3000 started once the API is healthy); README section.
 - **Blocked:** nothing broke. Adapted from the official Next.js example: no `public/` folder to copy, and the example's `.dockerignore` replaced by a short one. No `curl` in the API image, hence the Python health check.
 - **Measured:** first `up -d --build` 155 s, cached rebuild 7.7 s; images `mba-api` 646 MB, `mba-web` 386 MB (app folder 42 MB); memory at rest 150 MiB (api) + 176 MiB (web), 181 MiB after a page; 5 pages and 7 `/api/*` routes answer 200; `localhost:8000` refused from the host; uids 10001 (api) and 1000 (web); `down` 2.8 s.
+
+## Step 9 — 2026-10-19
+- **Done:** `.github/workflows/ci.yml` (jobs api, pipeline, web, docker), CI badge in the README; branch `step-09-ci`; GitHub CLI installed from the official repository to follow the runs.
+- **Blocked:** nothing broke: the first run was green. The Ubuntu package of GitHub CLI (2.46) is reported broken by its maintainers, so the official repository was used.
+- **Measured:** first run 2 min 8 s in total; api 30 s (install 19 s, 22 tests in 1.4 s), pipeline 2 min 4 s (install 85 s including the PySpark wheel build in 14 s, 37 tests in 23.7 s), web 38 s (npm ci 12 s, build 8 s), docker 45 s (build 40 s); caches saved: pip 1.04 GiB (pipeline), 83 MiB (api), npm 106 MiB; image sizes reported by the runner 457 MB (api) and 269 MB (web).
