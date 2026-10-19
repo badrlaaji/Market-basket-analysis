@@ -1120,6 +1120,127 @@ tr.is-selected > * {
   overflow-y: auto;
 }
 
+/* Bars drawn by Recharts, coloured by class */
+.bar-context {
+  fill: var(--context);
+}
+
+.bar-series-1 {
+  fill: var(--series-1);
+}
+
+.bar-series-2 {
+  fill: var(--series-2);
+}
+
+.bar-label,
+.recharts-label-list text {
+  fill: var(--ink-2);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-cursor {
+  fill: var(--accent-wash);
+}
+
+/* Basket page */
+.scenarios,
+.chips {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scenarios li + li {
+  margin-top: 0.5rem;
+}
+
+.scenarios button {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.chips-title {
+  margin-top: 1.25rem;
+  font-size: var(--step-0);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chips button {
+  border-radius: 999px;
+}
+
+.chips button[aria-pressed="true"] {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.coverage {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.lift-row {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.lift-row .lift {
+  text-align: right;
+  color: var(--ink);
+}
+
+.before-after {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+
+.before-after h3 {
+  font-size: var(--step-0);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+/* Win-back counters: the two numbers that move with the slider */
+.counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 3rem;
+  margin: 0 0 1.5rem;
+}
+
+.counters dt {
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.counters dd {
+  margin: 0;
+  font-size: var(--step-3);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 .tab-panel select {
   max-width: 32rem;
 }

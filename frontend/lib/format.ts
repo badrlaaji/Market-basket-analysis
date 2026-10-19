@@ -10,7 +10,7 @@ const compactPounds = new Intl.NumberFormat("en-GB", {
   style: "currency",
   currency: "GBP",
   notation: "compact",
-  maximumFractionDigits: 2,
+  maximumSignificantDigits: 3,
 });
 // Fixed names: Intl month names differ between ICU versions ("Sep" / "Sept"),
 // and the server and the browser must print the same text
@@ -37,7 +37,7 @@ export function productName(description: string): string {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
-/** 19643862 → "£19.64M"; 1452116 → "£1.45M". */
+/** 19643862 → "£19.6m"; 1452116 → "£1.45m"; 543650 → "£544k". */
 export function formatCompactPounds(value: number): string {
   return compactPounds.format(value);
 }

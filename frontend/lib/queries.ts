@@ -45,7 +45,14 @@ export function rulesExportQuery(filters: RuleFilters): string {
 // The /rules charts need every rule once (1,166 today; FastAPI accepts up to 2,000)
 export const ALL_RULES_QUERY = "?min_confidence=0&min_lift=0&sort=lift&limit=2000";
 
-/** Threshold → "?threshold=0.3&top=50". */
-export function atRiskQuery(threshold: number): string {
-  return `?${new URLSearchParams({ threshold: String(threshold), top: String(AT_RISK_TOP) })}`;
+/** Threshold (and segment) → "?threshold=0.3&top=50&segment=2". */
+export function atRiskQuery(threshold: number, segment: number | null = null): string {
+  const params = new URLSearchParams({ threshold: String(threshold), top: String(AT_RISK_TOP) });
+  if (segment !== null) params.set("segment", String(segment));
+  return `?${params}`;
+}
+
+/** Segment → "?segment=2", or "" for every segment. */
+export function segmentQuery(segment: number | null): string {
+  return segment === null ? "" : `?segment=${segment}`;
 }
