@@ -19,6 +19,7 @@ from api.schemas import (
     AtRiskPage,
     BandRevenue,
     BasketIn,
+    Flow,
     GridCell,
     Health,
     HistogramBin,
@@ -35,6 +36,7 @@ from api.schemas import (
     SegmentProduct,
     SegmentProfile,
     Stats,
+    Transitions,
 )
 
 # Default: outputs/ next to api/ (repository root, or /app in the image)
@@ -188,6 +190,17 @@ def get_segment_grid() -> list[GridCell]:
 def get_segment_k() -> KReport:
     """Silhouette of each number of segments tried, and the number kept."""
     return KReport(**DATA["k_report"])
+
+
+@app.get("/segments/transitions")
+def get_segment_transitions() -> Transitions:
+    """Customers moving between segments in the last 90 days (same model)."""
+    flows = DATA["transitions"]
+    return Transitions(
+        date_before=str(flows["date_before"].iloc[0]),
+        date_now=str(flows["date_now"].iloc[0]),
+        flows=to_models(flows, Flow),
+    )
 
 
 @app.get("/timeline")

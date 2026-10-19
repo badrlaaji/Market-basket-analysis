@@ -124,6 +124,18 @@ class KReport(BaseModel):
     scores: list[KScore]
 
 
+class Flow(BaseModel):
+    segment_before: int  # -1: no purchase before date_before (new customer)
+    segment_now: int
+    n_customers: int
+
+
+class Transitions(BaseModel):
+    date_before: str  # segments computed with the purchases before this date
+    date_now: str  # reference date of the current segments
+    flows: list[Flow]
+
+
 class Month(BaseModel):
     month: str  # "2011-11"
     revenue: float

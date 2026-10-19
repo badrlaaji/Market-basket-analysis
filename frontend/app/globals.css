@@ -935,6 +935,27 @@ tr.is-selected > * {
   stroke-opacity: 0.7;
 }
 
+/* Migration Sankey: nodes and flows in the colour of their segment */
+.migration-node.seg-0 { fill: var(--series-1); }
+.migration-node.seg-1 { fill: var(--series-2); }
+.migration-node.seg-2 { fill: var(--series-3); }
+.migration-node.seg-3 { fill: var(--series-4); }
+
+.migration-link {
+  fill: none;
+  stroke: var(--context);
+  stroke-opacity: 0.45;
+}
+
+.migration-link.seg-0 { stroke: var(--series-1); }
+.migration-link.seg-1 { stroke: var(--series-2); }
+.migration-link.seg-2 { stroke: var(--series-3); }
+.migration-link.seg-3 { stroke: var(--series-4); }
+
+.migration-link:hover {
+  stroke-opacity: 0.75;
+}
+
 /* Product view: two lists facing each other, bars grow away from the middle */
 .mirror {
   display: grid;

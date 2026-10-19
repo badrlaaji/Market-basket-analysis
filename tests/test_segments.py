@@ -10,14 +10,18 @@ from pyspark.ml.linalg import Vectors
 from pyspark.sql import DataFrame, SparkSession
 
 from pipeline.segments import (
+    add_log_features,
     add_shares,
     compute_rfm,
     fit_kmeans,
+    fit_scaler,
     k_report,
     name_segments,
     reference_date,
     scale_features,
+    segments_before,
     silhouette,
+    transition_counts,
 )
 
 CLEAN_SCHEMA = (
@@ -118,3 +122,25 @@ def test_k_report_is_json_ready() -> None:
         {"k": 2, "silhouette": 0.6},
         {"k": 3, "silhouette": 0.5},
     ]
+
+
+def test_segments_before_uses_only_older_purchases(
+    spark: SparkSession, clean: DataFrame
+) -> None:
+    """On 2011-11-20 only customer 200 had bought: 100 starts on 1 December."""
+    rfm = add_log_features(compute_rfm(clean, date(2011, 12, 10)))
+    scaler = fit_scaler(rfm)
+    model = fit_kmeans(scaler.transform(rfm), k=2)
+    ids = spark.createDataFrame([(0, 10), (1, 11)], "prediction int, segment int")
+    rows = segments_before(clean, date(2011, 11, 20), scaler, model, ids).collect()
+    assert [r.customer_id for r in rows] == [200]
+    assert rows[0].segment_before in (10, 11)
+
+
+def test_transition_counts_marks_new_customers() -> None:
+    """Customer 3 had no segment before: counted from -1 (new customer)."""
+    before = pd.DataFrame({"customer_id": [1, 2], "segment_before": [0, 3]})
+    now = pd.DataFrame({"customer_id": [1, 2, 3], "segment": [0, 0, 1]})
+    counts = transition_counts(before, now)
+    assert counts.columns.tolist() == ["segment_before", "segment_now", "n_customers"]
+    assert counts.values.tolist() == [[-1, 1, 1], [0, 0, 1], [3, 0, 1]]

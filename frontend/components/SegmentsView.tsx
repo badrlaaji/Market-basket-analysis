@@ -1,6 +1,7 @@
 "use client"; // the selected segment drives the scatter, the radar and the persona card
 
 import { useState } from "react";
+import MigrationFlows from "@/components/MigrationFlows";
 import PersonaCard from "@/components/PersonaCard";
 import RevenueTreemap from "@/components/RevenueTreemap";
 import RfmGrid from "@/components/RfmGrid";
@@ -12,7 +13,7 @@ import Tabs from "@/components/Tabs";
 import Term from "@/components/Term";
 import { formatInt } from "@/lib/format";
 import { topRevenueSegment } from "@/lib/insights";
-import type { GridCell, KReport, MapPoint, SegmentProfile } from "@/lib/types";
+import type { GridCell, KReport, MapPoint, SegmentProfile, Transitions } from "@/lib/types";
 
 /** Segment picker, three main charts, the persona card and the detail tabs. */
 export default function SegmentsView({
@@ -20,11 +21,13 @@ export default function SegmentsView({
   points,
   cells,
   kReport,
+  transitions,
 }: {
   profiles: SegmentProfile[];
   points: MapPoint[];
   cells: GridCell[];
   kReport: KReport;
+  transitions: Transitions;
 }) {
   const [segment, setSegment] = useState(topRevenueSegment(profiles).segment);
   const selected = profiles.find((p) => p.segment === segment) ?? profiles[0];
@@ -81,6 +84,13 @@ export default function SegmentsView({
           tabs={[
             { id: "grid", label: "RFM grid", content: <RfmGrid cells={cells} profiles={profiles} /> },
             { id: "treemap", label: "Revenue map", content: <RevenueTreemap profiles={profiles} /> },
+            {
+              id: "migration",
+              label: "Migration in 90 days",
+              content: (
+                <MigrationFlows transitions={transitions} profiles={profiles} focus={selected} />
+              ),
+            },
             {
               id: "k",
               label: "Choosing the number of segments",

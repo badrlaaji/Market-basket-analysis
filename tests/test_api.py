@@ -70,6 +70,15 @@ TOP_PRODUCTS = pd.DataFrame(
         "preference": [1.5, 1.2, 2.0],
     }
 )
+TRANSITIONS = pd.DataFrame(
+    {
+        "segment_before": [-1, 0, 0, 1],
+        "segment_now": [1, 0, 1, 1],
+        "n_customers": [2, 2, 1, 1],
+        "date_before": ["2011-09-11"] * 4,
+        "date_now": ["2011-12-10"] * 4,
+    }
+)
 MONTHLY = pd.DataFrame(
     {
         "month": ["2011-11", "2011-12"],
@@ -137,6 +146,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     SCORES.to_parquet(tmp_path / "repurchase_scores.parquet")
     TOP_PRODUCTS.to_parquet(tmp_path / "segment_top_products.parquet")
     MONTHLY.to_parquet(tmp_path / "monthly_sales.parquet")
+    TRANSITIONS.to_parquet(tmp_path / "segment_transitions.parquet")
     (tmp_path / "stats.json").write_text(json.dumps(STATS))
     (tmp_path / "model_report.json").write_text(json.dumps(MODEL_REPORT))
     (tmp_path / "segments_k_report.json").write_text(json.dumps(K_REPORT))
@@ -347,6 +357,18 @@ def test_segments_grid(client: TestClient) -> None:
 def test_segments_k(client: TestClient) -> None:
     """The k report is returned as written by the pipeline."""
     assert client.get("/segments/k").json() == K_REPORT
+
+
+def test_segments_transitions(client: TestClient) -> None:
+    """Dates once, then one flow per (before, now) pair; -1 = new customers."""
+    body = client.get("/segments/transitions").json()
+    assert (body["date_before"], body["date_now"]) == ("2011-09-11", "2011-12-10")
+    assert body["flows"][0] == {
+        "segment_before": -1,
+        "segment_now": 1,
+        "n_customers": 2,
+    }
+    assert sum(flow["n_customers"] for flow in body["flows"]) == 6
 
 
 def test_scenarios(client: TestClient) -> None:

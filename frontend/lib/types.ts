@@ -103,6 +103,18 @@ export type KReport = {
   scores: { k: number; silhouette: number }[];
 };
 
+export type Flow = {
+  segment_before: number; // -1: no purchase before date_before (new customer)
+  segment_now: number;
+  n_customers: number;
+};
+
+export type Transitions = {
+  date_before: string;
+  date_now: string;
+  flows: Flow[];
+};
+
 export type Month = {
   month: string; // "2011-11"
   revenue: number;

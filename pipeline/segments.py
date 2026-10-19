@@ -1,16 +1,16 @@
 """Customer segments: RFM -> log -> StandardScaler -> KMeans (k = 4).
 
 clean.parquet -> outputs/segments.parquet, outputs/segment_profiles.parquet,
-outputs/segments_k_report.json
+outputs/segments_k_report.json, outputs/segment_transitions.parquet
 """
 
 import json
 import time
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
-from pyspark.ml import Pipeline
+from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.clustering import KMeans, KMeansModel
 from pyspark.ml.evaluation import ClusteringEvaluator
 from pyspark.ml.feature import StandardScaler, VectorAssembler
@@ -25,6 +25,7 @@ CLEAN_PARQUET = ROOT / "data" / "interim" / "clean.parquet"
 SEGMENTS_PARQUET = ROOT / "outputs" / "segments.parquet"
 PROFILES_PARQUET = ROOT / "outputs" / "segment_profiles.parquet"
 K_REPORT_JSON = ROOT / "outputs" / "segments_k_report.json"
+TRANSITIONS_PARQUET = ROOT / "outputs" / "segment_transitions.parquet"
 
 # Choices measured in step 4 (DECISIONS.md D04-1 to D04-4)
 FEATURES = ["recency", "log_frequency", "log_monetary"]  # skew 12 and 25 before log
@@ -33,6 +34,8 @@ K = 4  # recent or not x high or low value
 SEED = 42
 MAX_ITER = 100  # default 20 is too few: up to 74 iterations measured (k = 8)
 SEGMENT_NAMES = ["Champions", "Promising", "At risk", "Lost"]  # segment 0 to 3
+TRANSITION_DAYS = 90  # segments 90 days before the reference date, same model
+NEW_CUSTOMER = -1  # segment_before of a customer with no purchase back then
 EXPERIMENT = "customer-segments"
 
 
@@ -61,14 +64,19 @@ def add_log_features(rfm: DataFrame) -> DataFrame:
     )
 
 
-def scale_features(rfm: DataFrame) -> DataFrame:
-    """Put FEATURES in one vector column, centered and scaled to unit variance."""
+def fit_scaler(rfm: DataFrame) -> PipelineModel:
+    """Learn the mean and standard deviation of FEATURES (kept to reuse them)."""
     stages = [
         VectorAssembler(inputCols=FEATURES, outputCol="raw_features"),
         # Spark default is withMean=False: values would not be centered
         StandardScaler(inputCol="raw_features", outputCol="features", withMean=True),
     ]
-    return Pipeline(stages=stages).fit(rfm).transform(rfm)
+    return Pipeline(stages=stages).fit(rfm)
+
+
+def scale_features(rfm: DataFrame) -> DataFrame:
+    """Put FEATURES in one vector column, centered and scaled to unit variance."""
+    return fit_scaler(rfm).transform(rfm)
 
 
 def fit_kmeans(features: DataFrame, k: int) -> KMeansModel:
@@ -131,6 +139,36 @@ def k_report(scores: dict[int, float], k: int) -> dict:
     }
 
 
+def segments_before(
+    clean: DataFrame,
+    before: date,
+    scaler: PipelineModel,
+    model: KMeansModel,
+    ids: DataFrame,
+) -> DataFrame:
+    """Segment of each customer at an earlier date, with today's scaler and centers."""
+    past = clean.filter(F.col("invoice_date") < F.lit(before))  # no later purchase
+    rfm = add_log_features(compute_rfm(past, before))
+    clustered = model.transform(scaler.transform(rfm))
+    return clustered.join(ids, "prediction").select(
+        "customer_id", F.col("segment").alias("segment_before")
+    )
+
+
+def transition_counts(before: pd.DataFrame, now: pd.DataFrame) -> pd.DataFrame:
+    """Customers per (segment before, segment now); NEW_CUSTOMER if absent before."""
+    joined = now[["customer_id", "segment"]].merge(before, on="customer_id", how="left")
+    joined["segment_before"] = (
+        joined["segment_before"].fillna(NEW_CUSTOMER).astype("int64")
+    )
+    counts = joined.groupby(["segment_before", "segment"]).size()
+    return (
+        counts.rename("n_customers")
+        .reset_index()
+        .rename(columns={"segment": "segment_now"})
+    )
+
+
 def main() -> None:
     """clean.parquet -> segments and profiles, read back, then log the run."""
     start = time.perf_counter()
@@ -138,7 +176,8 @@ def main() -> None:
     clean = spark.read.parquet(str(CLEAN_PARQUET))
     ref_date = reference_date(clean)
     rfm = add_log_features(compute_rfm(clean, ref_date))
-    features = scale_features(rfm).cache()
+    scaler = fit_scaler(rfm)
+    features = scaler.transform(rfm).cache()
 
     models = {k: fit_kmeans(features, k) for k in K_RANGE}
     scores = {k: silhouette(model, features) for k, model in models.items()}
@@ -155,6 +194,14 @@ def main() -> None:
     profiles[columns].to_parquet(PROFILES_PARQUET, index=False)
     K_REPORT_JSON.write_text(json.dumps(k_report(scores, K), indent=2))
 
+    # Same scaler and same centers applied 90 days earlier (bonus of step 7b)
+    before_date = ref_date - timedelta(days=TRANSITION_DAYS)
+    before = segments_before(clean, before_date, scaler, models[K], ids).toPandas()
+    transitions = transition_counts(before, segments.toPandas()).assign(
+        date_before=str(before_date), date_now=str(ref_date)
+    )
+    transitions.to_parquet(TRANSITIONS_PARQUET, index=False)
+
     back = spark.read.parquet(str(SEGMENTS_PARQUET))
     n_customers = back.count()
     print(f"Reference date: {ref_date}")
@@ -164,6 +211,13 @@ def main() -> None:
     print(f"Wrote {PROFILES_PARQUET.relative_to(ROOT)}")
     print(profiles[columns].round(3).to_string(index=False))
     print(f"Wrote {K_REPORT_JSON.relative_to(ROOT)}")
+    print(
+        f"Wrote {TRANSITIONS_PARQUET.relative_to(ROOT)} ({before_date} -> {ref_date})"
+    )
+    table = transitions.pivot(
+        index="segment_before", columns="segment_now", values="n_customers"
+    )
+    print(table.fillna(0).astype("int64").to_string())
     spark.stop()
 
     metrics = {"n_customers": n_customers}

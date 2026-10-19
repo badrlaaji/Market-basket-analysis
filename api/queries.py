@@ -171,6 +171,7 @@ def load_outputs(outputs_dir: Path) -> dict[str, Any]:
         "timeline": pd.read_parquet(outputs_dir / "monthly_sales.parquet"),
         "model": json.loads((outputs_dir / "model_report.json").read_text()),
         "scenarios": basket_scenarios(named_rules),
+        "transitions": pd.read_parquet(outputs_dir / "segment_transitions.parquet"),
     }
 
 
