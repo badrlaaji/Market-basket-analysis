@@ -17,7 +17,7 @@ The answers are served through a REST API and an interactive web app.
 - [x] 0. Repository, virtual environment, Spark smoke test
 - [x] 1. Excel to Parquet ingestion
 - [x] 2. Data cleaning with PySpark
-- [ ] 3. Association rules with FP-Growth
+- [x] 3. Association rules with FP-Growth
 - [ ] 4. RFM segmentation with KMeans
 - [ ] 5. Repurchase prediction (XGBoost vs baseline, tracked with MLflow)
 - [ ] 6. REST API (FastAPI) with tests
@@ -52,7 +52,7 @@ The data is not stored in this repository. Download it and run the pipeline with
 
 ```bash
 source .venv/bin/activate
-python -m pipeline.run_all   # downloads the data if missing, then builds data/interim/*.parquet
+python -m pipeline.run_all   # downloads the data if missing, then builds data/interim/*.parquet and outputs/rules.parquet
 ```
 
 Chen, D. (2012). Online Retail II [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5CG6D. Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

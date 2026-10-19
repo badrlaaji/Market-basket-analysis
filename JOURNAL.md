@@ -14,3 +14,9 @@
 - **Done:** shared Spark session; `pipeline/etl.py` (rename, normalize codes, 4 cleaning rules, integer customer id) writes `data/interim/clean.parquet`; 10 Spark tests (12 in total, 26.5 s).
 - **Blocked:** nothing. Profiling found invoice `A563185` (positive bad-debt adjustment) and 173 lower-case product codes before any rule was written.
 - **Measured:** 1,067,371 → 1,003,357 rows (−19,494 cancellations, −6,207 quantity/price, −4,649 non-products, −33,664 duplicates), equal to the pandas reference; 39,516 invoices, 4,725 products, 5,852 customers; 0 null description, 0 non-digit invoice; full pipeline 2 min 13 s, peak RAM 1.0 GB.
+
+## Step 3 — 2026-10-19
+- **Done:** `pipeline/rules.py` (baskets, FP-Growth, lift filter, consequent as text) writes `outputs/rules.parquet`; one MLflow run per execution in `mlruns/mlflow.db`; `scripts/check_rules.py` recomputes 5 rules with pandas; 6 new tests (18 in total).
+- **Blocked:** `StackOverflowError` at minSupport 0.005, then at 0.01 inside `run_all` only (2/2; 4/4 passes alone): the 1 MB Java thread stack is too small for deep FP-trees, fixed with `-Xss16m` in the shared session. MLflow 3.17.1 refuses the `./mlruns` file store: SQLite instead.
+- **Measured:** baskets median 15, p90 51, max 1,106 products; 707 products in ≥ 1 % of invoices; minSupport 0.02 / 0.01 / 0.005 → 113 / 1,166 / 10,586 rules, 45 / 224 / 592 products covered, deepest branch 197 / 441 / 751; 1,355 itemsets at 0.01; 5 rules equal to pandas (difference 0.0); full pipeline 3 min 31 s, peak RAM 2.4 GB.
+- **Note for step 7:** `/basket` must show a message when no product in the basket has a rule (only 224 of 4,725 products appear in a rule).

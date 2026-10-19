@@ -95,3 +95,43 @@ One entry per decision: context, options, choice, why.
 ### D02-6 Spark result checked against pandas
 - **Choice:** the same rules computed with pandas give the reference count; Spark must match it exactly.
 - **Result:** 1,003,357 rows on both sides, with the same count removed by each rule.
+
+## Step 3 — Association rules with FP-Growth
+
+### D03-1 minSupport 0.01, not 0.005
+- **Context:** 39,516 baskets (median 15 products, p90 51, max 1,106), minConfidence 0.2. Measured: 0.02 → 113 rules, 45 products covered; 0.01 → 1,166 rules, 224 products, 86 s, peak RAM 1.7 GB; 0.005 → 10,586 rules, 592 products, 124 s.
+- **Problem:** at 0.005 Spark failed with `java.lang.StackOverflowError`, not a memory error (peak 1.6 GB). Java serializes FP-trees recursively, and a branch is as deep as the number of frequent products in one basket: 197 / 441 / 751 at 0.02 / 0.01 / 0.005 (invoice 573585). It passed with a 16 MB thread stack (`-Xss16m`).
+- **Choice:** 0.01: an itemset must appear in at least 396 invoices.
+- **Why:** 1,166 rules can be checked and displayed, and the 224 covered products include the best sellers. 0.005 gives 9 times more rules.
+
+### D03-2 16 MB thread stack in the shared Spark session (C4 extended)
+- **Context:** at 0.01 the step passed alone (4 runs out of 4) but failed inside `pipeline.run_all`, after the ETL in the same JVM (2 out of 2), with the same `StackOverflowError`. A depth of 441 is close to the limit of the 1 MB default stack. Why the ETL run changes the outcome was not identified.
+- **Options:** `-Xss16m`; drop the longest baskets from FP-Growth; one process per Spark step; minSupport 0.02 (45 products).
+- **Choice:** `spark.driver.extraJavaOptions=-Xss16m` in `build_spark()`; a test checks that the JVM really started with it (the option is ignored if a session already exists).
+- **Why:** it fixes the cause without changing the data or the thresholds. `run_all` passes (211 s) with the same peak RAM as the failed runs (2.4 GB): stack pages are only used when needed.
+
+### D03-3 Confidence >= 0.2 and lift >= 1.5 kept as floors
+- **Context:** the lift filter removes 0 rules at 0.01 (5 at 0.005).
+- **Why it is almost inactive:** lift = confidence / support(consequent). The most frequent product (85123A) is in 13.8 % of invoices, so confidence >= 0.2 already implies lift >= 1.45.
+- **Choice:** keep both thresholds as export floors; the `/rules` sliders filter further.
+
+### D03-4 Consequent exported as text, antecedent sorted
+- **Context:** Spark returns `consequent` as an array. The Spark 4.2.0 guide says it always holds one item and lists 5 columns, `support` included (the installed docstring says "four columns"; 5 are returned).
+- **Choice:** `consequent[0]` as a string and `array_sort(antecedent)`; columns: antecedent, consequent, support, confidence, lift. A test checks the types.
+- **Why:** the API compares plain strings, and the antecedent order no longer depends on `collect_set`.
+
+### D03-5 MLflow on a SQLite database inside `mlruns/`
+- **Context:** MLflow 3.17.1 raises an exception for the `./mlruns` file store ("maintenance mode"). Its default is now `sqlite:///mlflow.db`, and artifacts go to `./mlruns` of the current folder.
+- **Options:** opt out with `MLFLOW_ALLOW_FILE_STORE=true`; SQLite at the repository root; SQLite inside `mlruns/`.
+- **Choice:** `sqlite:///<repo>/mlruns/mlflow.db`, with the experiment's artifacts pinned to `mlruns/artifacts/`.
+- **Why:** a supported backend, one folder already ignored by Git, and the same location whatever the working directory.
+
+### D03-6 Invoice 573585 kept as an extreme basket
+- **Context:** the largest basket has 1,106 distinct products (2011-10-31, no customer id, £14,838.86), 441 of them frequent at 0.01: the deepest FP-tree branch. The 20 largest baskets have no customer id; 58 baskets have more than 500 products.
+- **Options:** cap the basket size; drop these invoices; keep them.
+- **Choice:** keep them (the larger thread stack, D03-2, handles the depth).
+- **Why:** they are real, clean invoices. One basket weighs 1 of 39,516 and a rule needs at least 396 invoices, so it cannot create a rule alone. Without a customer id, they are already outside RFM and repurchase.
+
+### D03-7 Rules checked with pandas
+- **Choice:** `scripts/check_rules.py` recomputes 5 rules (max lift, max confidence, max support, 3-item antecedent, a rule with 85123A) from `clean.parquet` with set intersections, N = 39,516 invoices.
+- **Result:** identical values (max difference 0.0). Example: JUMBO BAG PINK POLKADOT → JUMBO BAG RED RETROSPOT, support 3.6 %, confidence 63.6 %, lift 6.26.
