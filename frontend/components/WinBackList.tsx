@@ -76,7 +76,7 @@ export default function WinBackList({
 
   const { total, revenue_at_risk: revenue, customers } = shown.page;
   const segmentName = profiles.find((p) => p.segment === segment)?.segment_name;
-  const scope = segmentName ? `${segmentName} customers` : "customers";
+  const scope = segmentName ? `${segmentName} customers` : "Customers";
 
   return (
     <>
