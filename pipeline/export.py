@@ -19,6 +19,7 @@ PRODUCT_COLUMNS = ["stock_code", "description", "n_invoices", "in_rules"]
 
 def most_frequent_description(clean: pd.DataFrame) -> pd.Series:
     """Most frequent description of each stock code (tie: alphabetical order)."""
+    clean = clean.assign(description=clean["description"].str.strip())  # "X " = "X"
     counts = clean.groupby(["stock_code", "description"]).size().rename("n")
     counts = counts.reset_index().sort_values(
         ["stock_code", "n", "description"], ascending=[True, False, True]

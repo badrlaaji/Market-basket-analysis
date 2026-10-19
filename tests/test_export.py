@@ -15,7 +15,7 @@ ROWS = [
     ("2", "A", "MUG RED", datetime(2010, 2, 1, 9, 0), None),
     ("2", "B", "LAMP", datetime(2010, 2, 1, 9, 0), None),
     ("3", "B", "BLUE LAMP", datetime(2011, 3, 1, 9, 0), 20.0),  # tie with LAMP
-    ("3", "C", "BOX", datetime(2011, 3, 1, 9, 0), 20.0),
+    ("3", "C", "BOX ", datetime(2011, 3, 1, 9, 0), 20.0),  # trailing space
 ]
 
 

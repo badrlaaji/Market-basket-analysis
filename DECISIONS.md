@@ -207,3 +207,36 @@ One entry per decision: context, options, choice, why.
 ### D05-7 Export: products and stats (contract extended)
 - **Choice:** `products.parquet` = most frequent description (tie: alphabetical order), distinct invoices, and `in_rules` (224 of 4,725 products appear in a rule), so that the basket page can point to products with recommendations.
 - **Choice:** `stats.json` = counts from the data and the model metrics, read from `data/interim/repurchase_metrics.json` (written by step 5, not part of the API contract). The raw row count comes from the Parquet metadata, without loading the rows.
+
+## Step 6 — REST API (FastAPI)
+
+### D06-1 Outputs loaded once with the lifespan, folder from `OUTPUTS_DIR`
+- **Context:** the outputs are small (1,166 rules, 4,725 products, 5,852 customers) and change only when the pipeline runs again.
+- **Choice:** a `lifespan` function (FastAPI docs: the code before `yield` runs once, before the first request) fills a module-level dict. The folder comes from `OUTPUTS_DIR`; default `outputs/` next to `api/`, the same path in the repository and in the image.
+- **Why:** each request is an in-memory pandas filter: loading takes 0.11 s, `/recommend` about 9 ms. The deprecated startup events are not used.
+
+### D06-2 Query logic in plain functions, responses in Pydantic schemas
+- **Choice:** `api/queries.py` holds pure pandas functions (filter, search, recommend, at-risk). `api/main.py` only validates parameters and turns rows into the schemas of `api/schemas.py`.
+- **Why:** the logic is readable and testable apart from HTTP. The schemas document Swagger and guarantee the JSON types (integer `customer_id`, lists instead of numpy arrays).
+
+### D06-3 Parameter validation and a tolerant `/recommend`
+- **Bounds:** `min_confidence` and `threshold` in [0, 1], `min_lift` ≥ 0, `sort` in {lift, confidence, support}, `limit` and `top` from 1 to 500, at most 50 basket codes, `k` from 1 to 20. Anything else returns `422`.
+- **`/recommend`:** codes are trimmed and upper-cased like in the ETL. Unknown codes are ignored and returned in `unknown_codes`. Each product is suggested once (rule with the highest lift), with that rule's antecedent in `because`.
+- **Why:** one mistyped code should not cancel a whole basket, but the caller is told about it.
+
+### D06-4 Product names joined at startup
+- **Choice:** names (most frequent description) are joined to the rules once, with a lower-case search text, so `/rules?product=` matches codes and names. `pipeline/export.py` now trims descriptions before counting them ("X " and "X" are the same name).
+- **Why:** no join per request, and the web app does not need a second call to display names.
+
+### D06-5 Docker image
+- **Choice:** `python:3.14-slim`; build context `api/` (the 1.4 GB `.venv` and `data/` are never sent); code copied into `/app/api`, so `uvicorn api.main:app` works as in the repository; user uid 10001; code owned by root; outputs mounted read-only.
+- **Result:** build 92 s, image 646 MB, Python 3.14.8 (the tag follows 3.14 patch releases; the local venv runs 3.14.4). No Java, PySpark or XGBoost inside. The API tests pass inside the image.
+
+### D06-6 PySpark import moved into the test fixture
+- **Context:** `tests/conftest.py` imported PySpark at the top, so every test run needed PySpark, even for the API.
+- **Choice:** import inside the `spark` fixture; the return annotation is quoted, under `TYPE_CHECKING`.
+- **Check:** after `pytest tests/test_api.py`, no `pyspark`, `py4j`, `xgboost` or `pipeline` module is loaded; the same file passes in the image, where PySpark is absent.
+
+### D06-7 Known issues (to review)
+- Starlette 1.9 warns that its test client should use `httpx2` instead of `httpx`. `httpx2` is not in the pinned dependencies, so `httpx` is kept (it still works).
+- `/at-risk` sorts by gross monetary (D04-5): at threshold 0.3, the first two customers (16446, £168,472 gross; 12346, £77,353) cancelled everything (net −£6 and −£268).
