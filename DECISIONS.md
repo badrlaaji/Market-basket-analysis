@@ -300,3 +300,55 @@ One entry per decision: context, options, choice, why.
 ### D09-3 Built-in caches only
 - **Choice:** `cache: pip` (setup-python, one key per requirements file) and `cache: npm` (setup-node, `frontend/package-lock.json`). `actions/cache` and Docker layer caching are not used.
 - **Why:** PySpark is published as a 450 MB sdist; the pip cache keeps the wheel built on the first run (cache of 1.04 GiB for the pipeline job).
+
+## Step 7b — Data presentation
+
+### D07b-1 Each page answers one business question
+- **Choice:** the page title is the question; under it, an answer sentence built from the API data (`lib/insights.ts`, pure functions: no figure written by hand); then one main chart, at most three main visuals, and the details in tabs. A glossary term shows its definition on hover and keyboard focus.
+- **Why:** a recruiter or a manager reads the answer first and the evidence second. Peaks, shares and the strongest rule are detected from the data, so the text stays true if the data changes.
+
+### D07b-2 RFM grid: recency fifths × fixed invoice bands
+- **Context:** `pd.qcut(frequency, 5)` fails: 27.6 % of the customers have exactly 1 invoice, so the quintile edges repeat (1, 1, 2, 4, 8, 373).
+- **Options:** ranks broken by `customer_id` then quintiles; fixed bands.
+- **Choice (validated by the project owner):** recency in quintiles (computed in the API), frequency in fixed bands 1 / 2 / 3–4 / 5–9 / 10+.
+- **Why:** a tie-break by id would split identical customers between two cells at random; fixed bands are readable and stable.
+
+### D07b-3 Products of a segment ranked by a preference index
+- **Context:** ranked by the share of the segment's customers who bought them, the top products are the same three in all four segments (White hanging heart, Regency cakestand, Pack of 72 retrospot cake cases).
+- **Choice (validated):** preference = share of the product in the segment's customer-product pairs ÷ its share in all pairs (a lift of the product inside the segment), among products bought by at least 5 % of the segment; top 5 in `segment_top_products.parquet`.
+- **Why:** four distinct lists; the threshold keeps rare products out.
+
+### D07b-4 Every rule loaded once for the charts, filters kept in the API
+- **Choice (validated):** `/rules` accepts `limit` up to 2,000 (other lists stay at 500): the page loads the 1,166 rules once (283 KB of JSON) for the scatter, the histograms and the product view, which draw the thresholds on them. The table, the flows and the CSV export keep the API filters; `GET /rules/export` reuses `filter_rules`, and the Next.js proxy now passes the content type and file name through.
+- **Rejected:** a CSV built in the browser (a second copy of the text search).
+
+### D07b-5 Sankey and Treemap: no cycle, explicit container
+- **Context (Recharts 3.10.1 source):** `Sankey` computes node depth by recursion and loops forever on A → B → A; 16 of the 17 links of the top 20 rules by lift have their mirror. `Sankey` and `Treemap` force `responsive: false`.
+- **Choice:** two separate columns ("if the basket has", "it also has"), each pair shown once, the first 20 pairs of the table; both charts inside `ResponsiveContainer`.
+- **Limit:** the strongest rules are mostly isolated pairs, so the flows look like parallel ribbons.
+
+### D07b-6 Colours checked with a validator
+- **Measured:** no set of four categorical colours passes the "all pairs" colour-blindness check of a scatter (4 sets tested, both themes). Blue, orange, aqua, yellow pass the "adjacent pairs" check in light and dark; the 5-step blue lift ramp passes the ordinal check.
+- **Choice:** segment colours for bars, treemap and flows; the segment scatter colours only the selected segment over grey points. Colours are CSS variables applied by class (Recharts puts a chart `className` on each grid line, not on a group).
+
+### D07b-7 Model report: real points, deciles, honest note
+- **Choice:** PR and ROC curves thinned to at most 100 real points (evenly spaced indices, ends kept, no interpolation); calibration in 10 deciles of the predicted probability (about 525 customers each) with a 95 % interval (normal approximation), drawn with `ErrorBar` and a diagonal `ReferenceLine`; importances = XGBoost gain.
+- **Rejected:** 10 equal-width bins (the high bins would be almost empty).
+- **Result:** in 10 of 10 deciles the observed rate is above the prediction (seasonal shift, D05-6); the page says so and advises using the scores as a ranking.
+
+### D07b-8 Win-back: net spend at stake, not future revenue
+- **Choice:** `/at-risk` returns `revenue_at_risk`, the sum of `monetary_net` of every customer below the threshold (same filter as the list), and takes a `segment`; `/at-risk/histogram` gives 20 bins of 0.05, the step of the slider.
+- **Why:** `monetary_net` is two years of past spend; calling it revenue at risk would overstate it. The label says "net spend over two years".
+
+### D07b-9 Partial month and radar
+- **Partial month:** December 2011 has 9 days of data (£614k): flagged `complete = False`, drawn dashed, never chosen as a peak.
+- **Radar:** five axes in mean percentile rank (0–100): recency (inverted), frequency, spend, average invoice value, probability of buying again. A three-axis radar is only a triangle.
+
+### D07b-10 Segment migration over 90 days (bonus)
+- **Choice:** the segments step keeps its fitted scaler and applies it, with the same KMeans centers, to the purchases made before the reference date minus 90 days (2011-09-11; one day after the T of D05, because it is derived from the segment reference date). Customers with no purchase back then count as new (`segment_before = -1`). Output `segment_transitions.parquet`, shown as a two-column Sankey.
+- **Measured:** 1,299 of the 1,345 Champions of 2011-09-11 are still Champions on 2011-12-10; 227 of 1,708 Promising became At risk; 596 customers are new.
+- **Limit:** the scaler is fitted on today's distribution; refitting it on the earlier date would move the borders between segments.
+
+### D07b-11 Known issues (to review)
+- `run_all` takes 5 min 42 s (4 min 24 s at step 5). The steps timed by MLflow did not grow much (rules 72 s, segments 59 s, repurchase 9 s); the difference sits in the untimed steps (Excel ingestion, cleaning) and was not investigated.
+- The Sankey of the strongest rules mostly shows isolated pairs (data, D07b-5). On a phone, the wide charts and tables scroll inside their frame.

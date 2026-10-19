@@ -2,7 +2,9 @@
 
 [![CI](https://github.com/badrlaaji/market-basket-analysis/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/badrlaaji/market-basket-analysis/actions/workflows/ci.yml)
 
-> **Work in progress.** Steps 0 to 9 are done: data pipeline, models, REST API, web app, Docker Compose and CI. AWS deployment comes next.
+> **Work in progress.** Steps 0 to 9 are done: data pipeline, models, REST API, web app, Docker Compose and CI, plus a redesign of the web app where each page answers one business question. AWS deployment comes next.
+
+![Overview page: monthly revenue with the November peaks, key figures and insights](docs/img/web-overview.png)
 
 ## Problem
 
@@ -32,12 +34,14 @@ The answers are served through a REST API and an interactive web app.
 ## Architecture
 
 ```
-OFFLINE   python -m pipeline.run_all            (about 4 min 30 s on a laptop, Spark local[2])
+OFFLINE   python -m pipeline.run_all            (about 5 min 45 s on a laptop, Spark local[2])
 
   download ─► Excel ─► raw.parquet ─► cleaning ─► clean.parquet ─┬─► FP-Growth ─────► rules.parquet
-              (pandas)                (PySpark)                  ├─► RFM + KMeans ──► segments.parquet, segment_profiles.parquet
-                                                                 ├─► XGBoost ───────► repurchase_scores.parquet
-                                                                 └─► export ────────► products.parquet, stats.json
+              (pandas)                (PySpark)                  ├─► RFM + KMeans ──► segments.parquet, segment_profiles.parquet,
+                                                                 │                    segments_k_report.json, segment_transitions.parquet
+                                                                 ├─► XGBoost ───────► repurchase_scores.parquet, model_report.json
+                                                                 └─► export ────────► products.parquet, stats.json,
+                                                                                      monthly_sales.parquet, segment_top_products.parquet
             experiments (thresholds, k, silhouettes, AUCs) ─► MLflow, local SQLite store
 
 ONLINE    Browser ─► Next.js pages + /api/* routes ─► FastAPI (Docker) ─► pandas DataFrames in memory
@@ -54,9 +58,9 @@ All figures are produced by the code of this repository (see `JOURNAL.md` and `D
 | Association rules (FP-Growth) | minSupport 0.01, confidence ≥ 0.2, lift ≥ 1.5: 1,166 rules covering 224 products. 5 rules recomputed with pandas give identical values. |
 | Segments (RFM + KMeans) | log1p on frequency and monetary, standardization, k = 4: Champions 1,650, Promising 2,076, At risk 869, Lost 1,257 customers. |
 | Repurchase within 90 days | Out-of-time validation: trained on features before 2011-06-12, tested on features before 2011-09-10 (5,256 customers, 43.5 % buy again). XGBoost **PR-AUC 0.770 / ROC-AUC 0.795** vs recency baseline 0.685 / 0.762. An anti-leak test checks that purchases after the reference date never change a feature. |
-| API | 7 endpoints, outputs loaded in 0.1 s, `/recommend` answers in about 9 ms (in-process test). 59 pytest tests in total. |
+| API | 16 endpoints, outputs loaded in 0.2 s, `/recommend` answers in about 9 ms (in-process test). 88 pytest tests in total. |
 | CI (GitHub Actions) | 4 parallel jobs on every push: API tests with the API dependencies only, pipeline tests with Java 21 and ruff, Next.js lint and build, build of both Docker images. About 2 minutes per run. |
-| Web app | 5 pages rendered on the server at request time, 7 proxy routes. Production build in 32 s with the API stopped (no API call at build time); a scripted browser run of the rules → basket → segments → win-back flow: 0 console errors, every request sent to the Next.js server only. |
+| Web app | 6 pages, one business question each, with an answer sentence generated from the data (no figure written by hand). Recharts only: scatter, Sankey, treemap, radar, histograms, calibration with error bars. Colours checked for colour blindness in light and dark themes. A scripted browser run of every page and tab: 0 console errors, every request sent to the Next.js server only, no horizontal scroll at 390 px. |
 
 **Known limitations.** The segments use monetary values gross of cancellations; the win-back list sorts by net value instead, because ranked by gross value its first two customers had cancelled almost all of their orders. The probabilities are shifted by seasonality (mean prediction 0.32 vs 0.44 observed on the test period, the Christmas peak), so they are best used to rank customers. Only 224 of the 4,725 products appear in a rule.
 
@@ -83,9 +87,18 @@ curl "http://localhost:8000/rules?limit=3"
 | `POST /recommend` | `{"items": [...], "k": 5}` → products to suggest, from the rules whose antecedent is in the basket; unknown codes are listed, not rejected |
 | `GET /segments` | RFM profile of each segment (size, share, means and medians) |
 | `GET /stats` | Key figures of the data, the rules and the model |
-| `GET /at-risk?threshold=&top=` | Customers with a repurchase probability below the threshold, highest net value first (cancellations deducted); gross and net values returned |
+| `GET /at-risk?threshold=&top=&segment=` | Customers with a repurchase probability below the threshold, highest net value first (cancellations deducted); gross and net values, and the total net spend of all of them |
+| `GET /rules/export?...` | Every rule matching the `/rules` filters, as a CSV file |
+| `GET /scenarios` | Example baskets: the product pairs that start the most rules, no product shared |
+| `GET /segments/map?n=` | A sample of customers (recency, frequency, spend, segment), each segment keeping its share; no customer ID |
+| `GET /segments/grid` | Customers per recency fifth × invoice band (1, 2, 3–4, 5–9, 10+) |
+| `GET /segments/k` | Silhouette for k = 2 to 8 and the k kept |
+| `GET /segments/transitions` | Customers moving between segments in the last 90 days (same scaler and centers) |
+| `GET /timeline` | Revenue, invoices and customers per month; partial months flagged |
+| `GET /model` | Model metrics, precision-recall and ROC curves against the baseline, calibration per decile, feature importances |
+| `GET /at-risk/histogram?segment=` | Customers and net spend per probability band of 0.05 |
 
-Parameters are validated (for example `min_confidence` and `threshold` in [0, 1], `limit` ≤ 500, at most 50 basket items); invalid values return `422`.
+Parameters are validated (for example `min_confidence` and `threshold` in [0, 1], `limit` ≤ 500, or ≤ 2,000 for `/rules`, at most 50 basket items); invalid values return `422`.
 
 <!-- Swagger UI screenshots: add docs/img/swagger-*.png here -->
 
@@ -98,15 +111,26 @@ cd frontend && npm ci && npm run dev   # terminal 2, http://localhost:3000
 
 `API_URL` (server side only) tells Next.js where FastAPI is: `http://localhost:8000` by default. Pages are server components that load their first data from FastAPI; interactive parts call the `/api/*` routes of Next.js, which forward to FastAPI. The FastAPI address never reaches the browser.
 
-| Page | What you can do |
-| --- | --- |
-| `/` | Key figures, the five strongest rules, the model against its baseline |
-| `/rules` | Filter rules by confidence, lift and product; sort them |
-| `/basket` | Build a basket and get "customers also buy" suggestions |
-| `/segments` | Click a segment to see its RFM profile (medians and means) |
-| `/win-back` | Move the probability threshold to list customers to contact, with net and gross spend |
+| Page | Question | What you can do |
+| --- | --- | --- |
+| `/` | What do two years of orders say? | Monthly revenue with the peaks, four key figures, three insights with an action each |
+| `/rules` | Which products sell together? | Scatter of every rule (support × confidence, lift as size and colour), a plain-language reading of the clicked rule, filters, CSV export; flows, one product's rules both ways, distributions |
+| `/basket` | What else goes in this basket? | One-click example baskets, popular products, suggestions with the product that triggers them, usual rate against the rate with your basket |
+| `/segments` | Who are the customers? | Recency × frequency scatter, persona card with preferred products, customers against revenue, radar; RFM grid, revenue treemap, silhouette per k, 90-day migration |
+| `/win-back` | Who is about to stop buying? | Probability histogram with the threshold line, live counters, filter by segment, customers to contact |
+| `/model` | Can we tell who will buy again? | Precision-recall and ROC against the baseline, calibration with 95 % intervals, feature importances, the seasonal shift explained |
 
-<!-- Web app screenshots: add docs/img/web-*.png here -->
+| | |
+| --- | --- |
+| ![Rules page: scatter of every rule and the selected rule in plain words](docs/img/web-rules.png) | ![Segments page: recency × frequency scatter and persona card](docs/img/web-segments.png) |
+| ![Basket page: example basket and suggestions](docs/img/web-basket.png) | ![Model page: precision-recall curve and calibration](docs/img/web-model.png) |
+| ![Win-back page: probability histogram with the threshold](docs/img/web-win-back.png) | ![Segments page in the dark theme](docs/img/web-segments-dark.png) |
+
+Dark theme and phone width are supported:
+
+![Overview, dark theme](docs/img/web-overview-dark.png)
+
+<img src="docs/img/web-rules-mobile.png" alt="Rules page on a phone" width="260"> <img src="docs/img/web-win-back-mobile.png" alt="Win-back page on a phone" width="260">
 
 ## Run with Docker Compose
 
@@ -140,7 +164,7 @@ The data is not stored in this repository. Download it and run the pipeline with
 ```bash
 source .venv/bin/activate
 python -m pipeline.run_all   # downloads the data if missing, then builds data/interim/*.parquet and outputs/
-pytest -q                    # 59 tests
+pytest -q                    # 88 tests
 ```
 
 Chen, D. (2012). Online Retail II [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5CG6D. Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
