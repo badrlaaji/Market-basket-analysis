@@ -55,6 +55,7 @@ SCORES = pd.DataFrame(
         "proba_90d": [0.9, 0.2, 0.1, 0.05, 0.6, 0.25],
         "segment": [0, 1, 1, 1, 0, 0],
         "monetary": [500.0, 300.0, 800.0, 100.0, 1000.0, 50.0],
+        "monetary_net": [500.0, 300.0, 0.0, 100.0, 900.0, 50.0],  # 103 cancelled all
     }
 )
 STATS = {
@@ -212,12 +213,22 @@ def test_stats(client: TestClient) -> None:
 
 
 def test_at_risk_threshold_sort_and_top(client: TestClient) -> None:
-    """4 customers below 0.3; most valuable first; integer ids."""
+    """4 customers below 0.3; highest net value first; integer ids; top 2."""
     body = client.get("/at-risk?threshold=0.3&top=2").json()
     assert body["total"] == 4
-    assert [c["customer_id"] for c in body["customers"]] == [103, 102]
+    assert [c["customer_id"] for c in body["customers"]] == [102, 104]
     assert all(isinstance(c["customer_id"], int) for c in body["customers"])
     assert body["customers"][0]["segment_name"] == "Lost"
+
+
+def test_at_risk_customer_who_cancelled_everything_comes_last(
+    client: TestClient,
+) -> None:
+    """103 has the highest gross value (800) but a net value of 0: last."""
+    body = client.get("/at-risk?threshold=0.3").json()
+    assert [c["customer_id"] for c in body["customers"]] == [102, 104, 106, 103]
+    last = body["customers"][-1]
+    assert (last["monetary"], last["monetary_net"]) == (800.0, 0.0)
 
 
 @pytest.mark.parametrize("query", ["threshold=1.5", "threshold=-0.1", "top=0"])

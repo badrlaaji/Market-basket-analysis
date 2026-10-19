@@ -122,6 +122,6 @@ def get_at_risk(
     threshold: Annotated[float, Query(ge=0, le=1)] = 0.3,
     top: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = 50,
 ) -> AtRiskPage:
-    """Customers unlikely to buy within 90 days, most valuable first."""
+    """Customers unlikely to buy within 90 days, highest net value first."""
     total, customers = queries.at_risk(DATA["scores"], threshold, top)
     return AtRiskPage(total=total, customers=to_models(customers, AtRiskCustomer))

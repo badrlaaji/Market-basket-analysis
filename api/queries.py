@@ -104,7 +104,7 @@ def recommend(
 def at_risk(
     scores: pd.DataFrame, threshold: float, top: int
 ) -> tuple[int, pd.DataFrame]:
-    """Customers with proba_90d < threshold, highest monetary first."""
+    """Customers with proba_90d < threshold, highest net value first (D06-8)."""
     risky = scores[scores["proba_90d"] < threshold]
-    risky = risky.sort_values("monetary", ascending=False, kind="stable")
+    risky = risky.sort_values("monetary_net", ascending=False, kind="stable")
     return len(risky), risky.head(top)

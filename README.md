@@ -52,9 +52,9 @@ All figures are produced by the code of this repository (see `JOURNAL.md` and `D
 | Association rules (FP-Growth) | minSupport 0.01, confidence ≥ 0.2, lift ≥ 1.5: 1,166 rules covering 224 products. 5 rules recomputed with pandas give identical values. |
 | Segments (RFM + KMeans) | log1p on frequency and monetary, standardization, k = 4: Champions 1,650, Promising 2,076, At risk 869, Lost 1,257 customers. |
 | Repurchase within 90 days | Out-of-time validation: trained on features before 2011-06-12, tested on features before 2011-09-10 (5,256 customers, 43.5 % buy again). XGBoost **PR-AUC 0.770 / ROC-AUC 0.795** vs recency baseline 0.685 / 0.762. An anti-leak test checks that purchases after the reference date never change a feature. |
-| API | 7 endpoints, outputs loaded in 0.1 s, `/recommend` answers in about 9 ms (in-process test). 57 pytest tests in total. |
+| API | 7 endpoints, outputs loaded in 0.1 s, `/recommend` answers in about 9 ms (in-process test). 59 pytest tests in total. |
 
-**Known limitations.** Monetary values are gross of cancellations: two of the largest "at risk" customers cancelled almost all of their orders. The probabilities are shifted by seasonality (mean prediction 0.32 vs 0.44 observed on the test period, the Christmas peak), so they are best used to rank customers. Only 224 of the 4,725 products appear in a rule.
+**Known limitations.** The segments use monetary values gross of cancellations; the win-back list sorts by net value instead, because ranked by gross value its first two customers had cancelled almost all of their orders. The probabilities are shifted by seasonality (mean prediction 0.32 vs 0.44 observed on the test period, the Christmas peak), so they are best used to rank customers. Only 224 of the 4,725 products appear in a rule.
 
 ## REST API
 
@@ -79,7 +79,7 @@ curl "http://localhost:8000/rules?limit=3"
 | `POST /recommend` | `{"items": [...], "k": 5}` → products to suggest, from the rules whose antecedent is in the basket; unknown codes are listed, not rejected |
 | `GET /segments` | RFM profile of each segment (size, share, means and medians) |
 | `GET /stats` | Key figures of the data, the rules and the model |
-| `GET /at-risk?threshold=&top=` | Customers with a repurchase probability below the threshold, highest monetary value first |
+| `GET /at-risk?threshold=&top=` | Customers with a repurchase probability below the threshold, highest net value first (cancellations deducted); gross and net values returned |
 
 Parameters are validated (for example `min_confidence` and `threshold` in [0, 1], `limit` ≤ 500, at most 50 basket items); invalid values return `422`.
 
@@ -100,7 +100,7 @@ The data is not stored in this repository. Download it and run the pipeline with
 ```bash
 source .venv/bin/activate
 python -m pipeline.run_all   # downloads the data if missing, then builds data/interim/*.parquet and outputs/
-pytest -q                    # 57 tests
+pytest -q                    # 59 tests
 ```
 
 Chen, D. (2012). Online Retail II [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5CG6D. Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

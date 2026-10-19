@@ -101,7 +101,8 @@ class AtRiskCustomer(BaseModel):
     proba_90d: float
     segment: int
     segment_name: str
-    monetary: float
+    monetary: float  # gross: purchases only (as in the segments)
+    monetary_net: float  # gross + cancellations: used to sort /at-risk
 
 
 class AtRiskPage(BaseModel):

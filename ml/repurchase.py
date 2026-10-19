@@ -1,6 +1,7 @@
 """Repurchase within 90 days: XGBoost vs a recency baseline, tracked with MLflow.
 
-clean.parquet -> outputs/repurchase_scores.parquet, data/interim/repurchase_metrics.json
+clean.parquet (+ raw.parquet for cancellations)
+  -> outputs/repurchase_scores.parquet, data/interim/repurchase_metrics.json
 """
 
 import json
@@ -12,9 +13,11 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
 from xgboost import XGBClassifier
 
+from pipeline.etl import NON_PRODUCT_CODES
 from pipeline.tracking import log_run
 
 ROOT = Path(__file__).resolve().parents[1]
+RAW_PARQUET = ROOT / "data" / "interim" / "raw.parquet"
 CLEAN_PARQUET = ROOT / "data" / "interim" / "clean.parquet"
 SEGMENTS_PARQUET = ROOT / "outputs" / "segments.parquet"
 SCORES_PARQUET = ROOT / "outputs" / "repurchase_scores.parquet"
@@ -42,7 +45,7 @@ XGB_PARAMS = {
     "random_state": 42,
     "n_jobs": 2,
 }
-SCORE_COLUMNS = ["customer_id", "proba_90d", "segment", "monetary"]
+SCORE_COLUMNS = ["customer_id", "proba_90d", "segment", "monetary", "monetary_net"]
 EXPERIMENT = "repurchase"
 
 
@@ -123,13 +126,32 @@ def score_date(df: pd.DataFrame) -> date:
     return df["invoice_date"].max().date() + timedelta(days=1)
 
 
+def cancelled_amounts(raw: pd.DataFrame) -> pd.Series:
+    """Cancelled amount per customer (negative), with the product rules of the ETL."""
+    raw = raw.assign(StockCode=raw["StockCode"].str.strip().str.upper())
+    cancelled = raw[
+        raw["Invoice"].str.startswith("C", na=False)
+        & ~raw["StockCode"].isin(NON_PRODUCT_CODES)  # same scope as monetary
+        & raw["Customer ID"].notna()
+    ].drop_duplicates()
+    amount = cancelled["Quantity"] * cancelled["Price"]  # quantity < 0
+    customers = cancelled["Customer ID"].astype("int64").rename("customer_id")
+    return amount.groupby(customers).sum()
+
+
 def score_customers(
-    model: XGBClassifier, features: pd.DataFrame, segments: pd.DataFrame
+    model: XGBClassifier,
+    features: pd.DataFrame,
+    segments: pd.DataFrame,
+    cancelled: pd.Series,
 ) -> pd.DataFrame:
-    """Contract table: probability per customer, segment joined for display only."""
+    """Contract table: probability per customer; segment and net value for display."""
     scores = pd.DataFrame(
         {"proba_90d": predict(model, features), "monetary": features["monetary"]}
     ).reset_index()
+    # Display only (D06-8): gross monetary + cancellations; not a model feature
+    refunds = scores["customer_id"].map(cancelled).fillna(0.0)
+    scores["monetary_net"] = scores["monetary"] + refunds
     scores = scores.merge(
         segments[["customer_id", "segment"]],
         on="customer_id",
@@ -164,7 +186,8 @@ def main() -> None:
     ref_date = score_date(df)
     now = build_features(df, ref_date)
     segments = pd.read_parquet(SEGMENTS_PARQUET)
-    scores = score_customers(model, now, segments)
+    cancelled = cancelled_amounts(pd.read_parquet(RAW_PARQUET))
+    scores = score_customers(model, now, segments, cancelled)
     scores.to_parquet(SCORES_PARQUET, index=False)
     back = pd.read_parquet(SCORES_PARQUET)
 
@@ -189,6 +212,12 @@ def main() -> None:
     print(back.dtypes.to_string())
     print(
         f"RFM vs segments.parquet ({len(segments):,} customers): {rfm_gap(now, segments)}"
+    )
+    lower = back["monetary_net"] < back["monetary"]
+    print(
+        f"monetary_net: {int(lower.sum()):,} customers with cancellations, "
+        f"{(back['monetary_net'] - back['monetary']).sum():,.2f} in total, "
+        f"{int((back['monetary_net'] < 0).sum())} below 0"
     )
     for key, value in summary.items():
         print(f"{key}: {value}")

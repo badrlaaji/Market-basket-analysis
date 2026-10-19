@@ -239,4 +239,10 @@ One entry per decision: context, options, choice, why.
 
 ### D06-7 Known issues (to review)
 - Starlette 1.9 warns that its test client should use `httpx2` instead of `httpx`. `httpx2` is not in the pinned dependencies, so `httpx` is kept (it still works).
-- `/at-risk` sorts by gross monetary (D04-5): at threshold 0.3, the first two customers (16446, £168,472 gross; 12346, £77,353) cancelled everything (net −£6 and −£268).
+- `/at-risk` sorted by gross monetary (D04-5) put first two customers who had cancelled almost everything: solved by D06-8.
+
+### D06-8 `/at-risk` sorted by net monetary value
+- **Context:** sorted by gross monetary (D04-5), the first two customers at threshold 0.3 (16446, £168,472 gross; 12346, £77,353) had cancelled almost all of their purchases.
+- **Options:** keep the gross value as a known limitation; add a net value used by `/at-risk` only; exclude customers who cancel a lot (arbitrary threshold).
+- **Choice:** `monetary_net` in `repurchase_scores.parquet` = gross monetary + cancelled product lines of `raw.parquet`, with the ETL rules (normalized codes, the 25 non-product codes excluded, exact duplicates removed). `/at-risk` sorts by it and returns both values. Segments are unchanged (C6), and `monetary_net` is not a model feature.
+- **Result:** 2,422 customers have cancellations (−£708,584 in total; −£1,095,137 if non-product codes were kept), 3 have a negative net value. 16446 (net £2.90) moves from rank 1 to rank 3,181 of 3,198, 12346 (net £169.36) to rank 2,559. Model metrics unchanged.

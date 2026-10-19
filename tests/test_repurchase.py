@@ -10,6 +10,7 @@ from ml.repurchase import (
     COLUMNS,
     build_dataset,
     build_features,
+    cancelled_amounts,
     evaluate,
     load_transactions,
     recency_baseline,
@@ -112,29 +113,51 @@ def test_score_date_is_day_after_last_invoice(transactions: pd.DataFrame) -> Non
     assert score_date(transactions) == date(2011, 12, 10)
 
 
+def test_cancelled_amounts_uses_the_etl_product_rules() -> None:
+    """Customer 1: -3 (duplicate and postage ignored); 2: -5; unknown dropped."""
+    day = datetime(2011, 5, 2, 10, 0)
+    rows = [
+        ("C1", "a ", "RED MUG", -2, day, 1.5, 1.0, "UK"),  # code normalized to A
+        ("C1", "a ", "RED MUG", -2, day, 1.5, 1.0, "UK"),  # exact duplicate
+        ("C2", "POST", "POSTAGE", -1, day, 18.0, 1.0, "UK"),  # not a product
+        ("C3", "22423", "CAKESTAND", -1, day, 5.0, 2.0, "UK"),
+        ("C4", "22423", "CAKESTAND", -3, day, 5.0, None, "UK"),  # no customer
+        ("10", "A", "RED MUG", 4, day, 1.5, 1.0, "UK"),  # a purchase, not cancelled
+    ]
+    columns = ["Invoice", "StockCode", "Description", "Quantity"]
+    columns += ["InvoiceDate", "Price", "Customer ID", "Country"]
+    cancelled = cancelled_amounts(pd.DataFrame(rows, columns=columns))
+    assert cancelled.to_dict() == {1: -3.0, 2: -5.0}
+
+
 def test_score_customers_contract(transactions: pd.DataFrame) -> None:
-    """Contract columns and types; the segment is only joined, not a feature."""
+    """Contract columns and types; segment and net value are display only."""
     model = train_model(build_dataset(transactions, REF))
     segments = pd.DataFrame(
         {"customer_id": pd.array([4, 1, 2], dtype="int32"), "segment": [1, 0, 3]}
     )
-    scores = score_customers(model, build_features(transactions, REF), segments)
+    cancelled = pd.Series({1: -3.0, 2: -5.0})  # customer 2 cancelled everything
+    features = build_features(transactions, REF)
+    scores = score_customers(model, features, segments, cancelled)
     assert scores.columns.tolist() == [
         "customer_id",
         "proba_90d",
         "segment",
         "monetary",
+        "monetary_net",
     ]
     assert scores["customer_id"].tolist() == [1, 2, 4]
     assert scores["customer_id"].dtype == "int64"
     assert scores["segment"].tolist() == [0, 3, 1]
     assert scores["proba_90d"].between(0, 1).all()
     assert scores["monetary"].tolist() == [13.0, 5.0, 2.0]
+    assert scores["monetary_net"].tolist() == [10.0, 0.0, 2.0]  # 4: no cancellation
 
 
 def test_score_customers_fails_on_missing_segment(transactions: pd.DataFrame) -> None:
     """A customer without segment raises instead of writing a NaN segment."""
     model = train_model(build_dataset(transactions, REF))
     segments = pd.DataFrame({"customer_id": [1, 2], "segment": [0, 3]})
+    features = build_features(transactions, REF)
     with pytest.raises(ValueError):
-        score_customers(model, build_features(transactions, REF), segments)
+        score_customers(model, features, segments, pd.Series(dtype="float64"))
