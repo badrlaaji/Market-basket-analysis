@@ -60,3 +60,13 @@
 - **Done:** interface rewritten for non-specialists: menu named by questions, plain words, one "What to do" box per page, technical charts in a closed analyst block; new look (shopfront green, Retrospot red, system book serif, basket as a till receipt, logo); new main chart on the model page; 3 small components (`NextStep`, `AnalystDetails`, `Logo`); README page table and the 10 screenshots updated.
 - **Blocked:** `next dev` opened from `127.0.0.1` never hydrated (dev assets blocked for that origin, `allowedDevOrigins` in the Next.js docs): checks moved to the production build. The 7b browser script could close the user's Edge tabs: fixed in the copy used here.
 - **Measured:** 27 frontend files changed (+1,095 / −566 lines, 3 new components of 67 lines in total); `npm run lint` clean, build compiled in 9.2 s; 6 pages and the `/api/*` routes answer `200`; browser run of the 6 pages in light, dark and 390 px: 0 console error, 0 exception, one host (`127.0.0.1:3000`), page width 390 px on a phone; no FastAPI address in `.next/static`; 10 screenshots, 968 KB.
+
+## Step 10 — 2026-10-20
+- **Done:** nothing on AWS: the deployment was postponed by choice to finish the project first (D10-1). An AWS account exists; no resource was created.
+- **Blocked:** nothing.
+- **Measured:** no AWS cost.
+
+## Step 11 — 2026-10-20
+- **Done:** final README (problem, demo, architecture, results, quick start, structure, key choices, limitations, data, license); `step-09-ci` deleted locally and on GitHub; final review of code, tests, build, Compose, links and history.
+- **Blocked:** Docker Desktop's engine stopped while WSL finished an update (Windows Installer error 1618: another installation was running); restarting Docker Desktop once the update was over fixed it.
+- **Measured:** ruff clean; 88 tests in 68 s (peak 310 MB); clean `next build` 42 s (peak 824 MB); `compose up --build` 57 s; images 646 MB (api) and 389 MB (web); memory after loading every page 127 MiB (api) and 75 MiB (web); 6 pages and 6 `/api/*` routes answer `200` through Compose, 0 published port on the API; README links: 14 local files present, 6 external links answer `200`; no assistant mention in the tracked files or in the history.

@@ -375,3 +375,20 @@ One entry per decision: context, options, choice, why.
 ### D07c-5 Screenshots from the production build
 - **Measured:** opened from Windows at `127.0.0.1:3000`, `next dev` refused its hot-reload websocket and the page never became interactive (a click did nothing). The Next.js docs (`allowedDevOrigins`) say the dev server blocks cross-origin requests to dev assets except from `localhost` and the hostname it was started with; `localhost` itself times out from Windows (IPv6, step 7 demo).
 - **Choice:** checks and screenshots run on the standalone build. The browser script now stops only the Edge processes of its own profile (the previous version could close the user's Edge tabs).
+
+## Step 10 — AWS deployment (postponed)
+
+### D10-1 Deployment postponed
+- **Context:** the AWS plan was ready (private S3 bucket, read-only IAM role, EC2 t3.small with swap, port 80 only, SSH from one IP, MFA and a budget alert first) and an AWS account exists.
+- **Choice (owner, 2026-10-20):** finish the project first (step 11) and deploy later. No AWS resource was created, so nothing is billed.
+- **Consequence:** the README says the app runs locally with Docker Compose and lists the deployment as a limitation; the plan stays in the project notes.
+
+## Step 11 — Final touches
+
+### D11-1 README written for a first visit
+- **Choice:** problem, demo, architecture, results, quick start, structure, key choices, limitations, data, license, in that order. The demo shows one screenshot per machine learning technique (association rules, clustering, classification); the endpoint and page tables and the other screenshots are folded in `<details>` blocks.
+- **Rule kept:** every figure comes from `JOURNAL.md`, `outputs/stats.json` or the pipeline outputs; the memory figure was measured again (127 and 75 MiB) instead of reusing the step 8 value, because the web image changed at step 7c.
+- **Rejected:** a "work in progress" checklist at the top (the history lives in `JOURNAL.md`).
+
+### D11-2 Clean branches, tag after the video
+- **Choice:** `step-09-ci`, fully merged (0 commit ahead, checked locally and on GitHub), deleted on both sides. The `v1.0` tag is an annotated tag created only once the demo video is in the README.
