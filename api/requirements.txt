@@ -1,0 +1,8 @@
+# API image (no Java, no Spark, no XGBoost). Pinned on 2026-10-19.
+# pandas and pyarrow must match the root requirements.txt.
+fastapi==0.146.0
+uvicorn==0.54.0
+pandas==2.3.3
+pyarrow==25.0.1
+pytest==9.1.1
+httpx==0.28.1
