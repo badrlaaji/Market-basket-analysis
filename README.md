@@ -19,7 +19,7 @@ The answers are served through a REST API and an interactive web app.
 - [x] 2. Data cleaning with PySpark
 - [x] 3. Association rules with FP-Growth
 - [x] 4. RFM segmentation with KMeans
-- [ ] 5. Repurchase prediction (XGBoost vs baseline, tracked with MLflow)
+- [x] 5. Repurchase prediction (XGBoost vs baseline, tracked with MLflow)
 - [ ] 6. REST API (FastAPI) with tests
 - [ ] 7. Web interface (Next.js)
 - [ ] 8. Docker Compose

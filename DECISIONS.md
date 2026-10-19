@@ -170,3 +170,40 @@ One entry per decision: context, options, choice, why.
 
 ### D04-7 Shared MLflow helper
 - **Choice:** `pipeline/tracking.py` holds the SQLite settings and `log_run()`, used by the rules and segments steps (and by step 5).
+
+## Step 5 — Repurchase prediction (XGBoost vs baseline)
+
+### D05-1 Label window [ref, ref + 90 days) (to review)
+- **Context:** C7 says "a purchase between T and 2011-12-09"; T = 2011-09-10 is the last invoice date minus 90 days, and the last invoice is on 2011-12-09 at 12:50.
+- **Options:** a half-open 90-day window; an inclusive window (91 days, 2011-12-09 included).
+- **Choice:** `ref <= invoice_date < ref + 90 days`, for both training and test.
+- **Why:** both windows have the same length. Cost measured at T: 2,287 positives instead of 2,289. 2011-09-10 is a Saturday without invoices, so the training and test windows never overlap.
+
+### D05-2 Out-of-time validation
+- **Context:** a random split of customers would put the same weeks in training and test.
+- **Choice:** training set = features before 2011-06-12, label up to 2011-09-10 (4,951 customers, 32.3 % positive). Test set = features before 2011-09-10, label up to 2011-12-09 (5,256 customers, 43.5 %).
+- **Why:** the model is judged as in production: trained on the past, scored on a later period. Customers whose first purchase falls inside the window are excluded (305 and 595): they have no history to score.
+
+### D05-3 Final scores come from the validated model (to review)
+- **Context:** every customer is scored on 2011-12-10 (day after the last invoice, same date as the segments).
+- **Options:** reuse the model trained at T − 90 days; refit it on the T dataset.
+- **Choice:** reuse the validated model.
+- **Why:** the reported metrics describe the model that actually produces the scores. Its training base rate (32.3 %, June to September) is close to the base rate of the window being predicted, measured one year earlier (December 2010 to March 2011: 30.7 %). The T window is the Christmas peak (43.5 %; 57.6 % one year earlier).
+
+### D05-4 Features in pandas, one function for training, test and scoring
+- **Context:** 776,596 rows with a customer id. XGBoost and scikit-learn work on pandas or numpy anyway.
+- **Choice:** `build_features(df, ref_date)` in pandas, whose first line keeps `invoice_date < ref_date`. 7 features: recency, frequency, monetary, tenure, average basket, distinct products, invoices in the last 90 days. No segment: it is computed on all dates.
+- **Checks:** at 2011-12-10, recency, frequency and monetary equal `segments.parquet` (Spark) for all 5,852 customers (max gaps 0, 0, 2.3e-10). The anti-leak test fails if `<` becomes `<=` (checked on a mutated copy).
+
+### D05-5 Recency baseline, fixed XGBoost parameters
+- **Choice:** baseline score = −recency. XGBoost: 200 trees, depth 3, learning rate 0.05, seed 42, 2 threads; nothing is tuned on the test period.
+- **Metrics:** PR-AUC (`average_precision_score`; a random score gets the positive rate, 0.435) and ROC-AUC.
+- **Result at T:** XGBoost PR-AUC 0.770 / ROC-AUC 0.795; baseline 0.685 / 0.762. Two runs give identical metrics and scores.
+
+### D05-6 Probabilities shifted by seasonality (known limitation)
+- **Measure:** mean predicted probability on the test period 0.316, observed rate 0.435: the model learned on a period with 32.3 % of buyers.
+- **Consequence:** the ranking metrics are not affected, but the `/at-risk` threshold is a relative score, not an exact probability.
+
+### D05-7 Export: products and stats (contract extended)
+- **Choice:** `products.parquet` = most frequent description (tie: alphabetical order), distinct invoices, and `in_rules` (224 of 4,725 products appear in a rule), so that the basket page can point to products with recommendations.
+- **Choice:** `stats.json` = counts from the data and the model metrics, read from `data/interim/repurchase_metrics.json` (written by step 5, not part of the API contract). The raw row count comes from the Parquet metadata, without loading the rows.
