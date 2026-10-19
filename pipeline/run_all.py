@@ -1,6 +1,6 @@
 """Run the whole offline pipeline: python -m pipeline.run_all"""
 
-from pipeline import etl, ingest, rules
+from pipeline import etl, ingest, rules, segments
 from scripts import download_data
 
 
@@ -10,6 +10,7 @@ def main() -> None:
     ingest.main()
     etl.main()
     rules.main()
+    segments.main()
 
 
 if __name__ == "__main__":

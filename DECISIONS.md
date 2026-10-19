@@ -135,3 +135,38 @@ One entry per decision: context, options, choice, why.
 ### D03-7 Rules checked with pandas
 - **Choice:** `scripts/check_rules.py` recomputes 5 rules (max lift, max confidence, max support, 3-item antecedent, a rule with 85123A) from `clean.parquet` with set intersections, N = 39,516 invoices.
 - **Result:** identical values (max difference 0.0). Example: JUMBO BAG PINK POLKADOT → JUMBO BAG RED RETROSPOT, support 3.6 %, confidence 63.6 %, lift 6.26.
+
+## Step 4 — Customer segments (RFM + KMeans)
+
+### D04-1 log1p of frequency as well as monetary (C6 amended)
+- **Context:** 5,852 customers, reference date 2011-12-10. Skew: recency 0.9, frequency 12.0, monetary 25.3; after log1p: frequency 1.00, monetary 0.27.
+- **Problem:** with raw frequency (C6 as first written: log of amounts only), the scaled frequency reaches z = 28.8 (5.4 after log1p) and KMeans isolates 21 wholesale customers from k = 4 (2 customers at k = 7).
+- **Choice:** features recency, log1p(frequency), log1p(monetary).
+- **Why:** every segment keeps at least 259 customers for all k from 2 to 8. Silhouettes of two different feature spaces were not compared.
+
+### D04-2 k = 4
+- **Context:** the silhouette decreases with k: 0.599 (k = 2), 0.576, 0.553, 0.537 (k = 5) down to 0.469 (k = 8). Alone, it would pick k = 2.
+- **Choice:** k = 4, inside the 3 to 5 range of C6.
+- **Why:** the 4 profiles form clear quadrants (recent or not × higher or lower value), the smallest segment has 869 customers (15 %), and "At risk" matches the win-back use case. k = 5 only splits the best customers in two.
+
+### D04-3 Segments named by rules on their profiles
+- **Context:** KMeans cluster numbers are arbitrary.
+- **Choice:** the 2 clusters with the lowest mean recency are "recent"; in each pair, the higher mean monetary comes first. Names Champions, Promising, At risk, Lost = segments 0 to 3. A test permutes the cluster numbers.
+- **Result (mean recency / frequency / monetary):** Champions 48 days / 15.9 invoices / £8,456 (1,650 customers); Promising 73 / 2.7 / £763 (2,076); At risk 374 / 3.6 / £1,391 (869); Lost 492 / 1.2 / £258 (1,257).
+
+### D04-4 Spark ML settings checked
+- `StandardScaler(withMean=True)`: Spark does not center by default (`withMean=False`). A test checks mean 0 and standard deviation 1 (sample, n − 1).
+- `KMeans(seed=42, maxIter=100)`: the default 20 iterations is too few (28 at k = 5, 74 at k = 8); with the seed, two runs give the same silhouettes.
+- The Spark silhouette uses the squared Euclidean distance (Spark 4.2.0 docs): 0.553 at k = 4, against 0.384 for the usual Euclidean silhouette (scikit-learn, measured once). It is logged as `silhouette_sq_k*`.
+
+### D04-5 Monetary kept gross of cancellations
+- **Context:** the ETL removes cancellation lines, but the purchases they cancel stay. £1.10M cancelled vs £17.07M gross (6.4 %); 68 customers cancelled at least half of their gross amount, and cancellations can exceed purchases (3.9 times for one customer).
+- **Options:** subtract cancellations taken from the raw data; keep the definition (sum of quantity × price on clean data).
+- **Choice:** keep it gross, as a known limitation.
+- **Why:** the log reduces the effect, and netting would bring back rows rejected by the ETL, some of them cancelling purchases that are not in the data.
+
+### D04-6 Results checked with pandas
+- **Result:** same 5,852 customers; recency and frequency identical for every customer, monetary within 2.3e-10; total £17,068,582.74.
+
+### D04-7 Shared MLflow helper
+- **Choice:** `pipeline/tracking.py` holds the SQLite settings and `log_run()`, used by the rules and segments steps (and by step 5).

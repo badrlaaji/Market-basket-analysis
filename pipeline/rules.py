@@ -3,26 +3,21 @@
 import time
 from pathlib import Path
 
-import mlflow
 from pyspark.ml.fpm import FPGrowth, FPGrowthModel
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from pipeline.spark_session import build_spark
+from pipeline.tracking import log_run
 
 ROOT = Path(__file__).resolve().parents[1]
 CLEAN_PARQUET = ROOT / "data" / "interim" / "clean.parquet"
 RULES_PARQUET = ROOT / "outputs" / "rules.parquet"
 
-# Thresholds measured in step 3 (DECISIONS.md D03-1, D03-2)
+# Thresholds measured in step 3 (DECISIONS.md D03-1, D03-3)
 MIN_SUPPORT = 0.01  # itemset in at least 396 of the 39,516 invoices
 MIN_CONFIDENCE = 0.2
 MIN_LIFT = 1.5
-
-# MLflow 3.17 refuses the ./mlruns file store: SQLite database inside mlruns/
-MLRUNS = ROOT / "mlruns"
-MLFLOW_URI = f"sqlite:///{MLRUNS / 'mlflow.db'}"
-MLFLOW_ARTIFACTS = MLRUNS / "artifacts"
 EXPERIMENT = "association-rules"
 
 
@@ -60,21 +55,6 @@ def count_products(rules: DataFrame) -> int:
     return rules.select(F.explode(items)).distinct().count()
 
 
-def log_run(params: dict[str, float], metrics: dict[str, float]) -> None:
-    """Record thresholds and counts as one MLflow run."""
-    MLRUNS.mkdir(exist_ok=True)
-    mlflow.set_tracking_uri(MLFLOW_URI)
-    if mlflow.get_experiment_by_name(EXPERIMENT) is None:
-        # Default artifact folder is ./mlruns of the current directory: pin it
-        mlflow.create_experiment(
-            EXPERIMENT, artifact_location=MLFLOW_ARTIFACTS.as_uri()
-        )
-    mlflow.set_experiment(EXPERIMENT)
-    with mlflow.start_run(run_name=f"min_support={params['min_support']}"):
-        mlflow.log_params(params)
-        mlflow.log_metrics(metrics)
-
-
 def main() -> None:
     """clean.parquet -> rules.parquet, read it back, then log the run."""
     start = time.perf_counter()
@@ -107,8 +87,7 @@ def main() -> None:
         "min_confidence": MIN_CONFIDENCE,
         "min_lift": MIN_LIFT,
     }
-    log_run(params, metrics)
-    print(f"MLflow run logged in {MLRUNS.relative_to(ROOT)}/ ({EXPERIMENT})")
+    log_run(EXPERIMENT, f"min_support={MIN_SUPPORT}", params, metrics)
 
 
 if __name__ == "__main__":
