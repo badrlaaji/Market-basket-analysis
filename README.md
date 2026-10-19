@@ -1,6 +1,6 @@
 # Market Basket Analysis
 
-> **Work in progress.** Steps 0 to 7 are done: data pipeline, models, REST API and web app. Docker Compose, CI and AWS deployment come next.
+> **Work in progress.** Steps 0 to 8 are done: data pipeline, models, REST API, web app and Docker Compose. CI and AWS deployment come next.
 
 ## Problem
 
@@ -22,7 +22,7 @@ The answers are served through a REST API and an interactive web app.
 - [x] 5. Repurchase prediction (XGBoost vs baseline, tracked with MLflow)
 - [x] 6. REST API (FastAPI) with tests and a Docker image
 - [x] 7. Web interface (Next.js)
-- [ ] 8. Docker Compose
+- [x] 8. Docker Compose
 - [ ] 9. CI with GitHub Actions
 - [ ] 10. Deployment on AWS (S3 + EC2)
 - [ ] 11. Final README, demo video, `v1.0`
@@ -104,6 +104,23 @@ cd frontend && npm ci && npm run dev   # terminal 2, http://localhost:3000
 | `/win-back` | Move the probability threshold to list customers to contact, with net and gross spend |
 
 <!-- Web app screenshots: add docs/img/web-*.png here -->
+
+## Run with Docker Compose
+
+The pipeline outputs must exist in `outputs/` (run `python -m pipeline.run_all` once). Then, from the repository root:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --build   # http://localhost:3000
+docker compose -f infra/docker-compose.yml ps              # api: healthy
+docker compose -f infra/docker-compose.yml down
+```
+
+Only the web app publishes a port (3000). The API listens on the internal Docker network (`http://api:8000`), so it cannot be reached from the host. The web container starts once the API answers its health check. Both containers run as non-root users; `outputs/` is mounted read-only.
+
+| Image | Size | Memory at rest |
+| --- | --- | --- |
+| `mba-api` (python:3.14-slim, FastAPI, pandas) | 646 MB | 150 MiB |
+| `mba-web` (node:24.22.0-slim, Next.js standalone) | 386 MB | 176 MiB |
 
 ## Stack
 

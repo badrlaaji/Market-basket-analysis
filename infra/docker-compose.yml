@@ -1,0 +1,38 @@
+# Web app + API. From the repository root:
+#   docker compose -f infra/docker-compose.yml up -d --build
+# Relative paths are resolved from this folder (infra/).
+name: market-basket-analysis
+
+services:
+  api:
+    build: ../api
+    image: mba-api
+    volumes:
+      - ../outputs:/app/outputs:ro # pipeline outputs, read-only
+    expose:
+      - "8000" # internal network only: no "ports", so the host cannot reach it
+    healthcheck:
+      # No curl in python:3.14-slim: urlopen raises (exit 1) if /health does not answer
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+      start_interval: 2s
+    restart: unless-stopped
+
+  web:
+    build: ../frontend
+    image: mba-web
+    ports:
+      - "3000:3000" # the only published port
+    depends_on:
+      api:
+        condition: service_healthy # start once the API answers /health
+    restart: unless-stopped

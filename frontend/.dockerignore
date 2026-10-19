@@ -1,0 +1,13 @@
+# Installed or generated inside the image, never copied
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Local settings and secrets
+.env*
+
+# Not needed to build
+Dockerfile
+.dockerignore
+*.md

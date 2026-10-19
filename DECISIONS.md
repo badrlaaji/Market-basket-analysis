@@ -270,3 +270,19 @@ One entry per decision: context, options, choice, why.
 ### D07-5 Known issues (to review)
 - `npm audit`: 5 "high" alerts, all in the ESLint chain (`braces` via `eslint-config-next` → `fast-glob`), a development tool that is not shipped. `npm audit fix --force` would downgrade to Next 14: not applied.
 - Recharts depends on `react-is` 16.13.1 (allowed by its peer range); its `isFragment` does not recognize React 19 elements. No fragment is placed inside a chart; adding `react-is@19` (outside the stack) is not needed for now.
+
+## Step 8 — Docker Compose
+
+### D08-1 Web image from the official Next.js example, adapted
+- **Choice:** three stages on `node:24.22.0-slim` (same Node as development, current LTS): `npm ci` with a BuildKit cache, `next build`, then a runtime stage with only `.next/standalone` and `.next/static`, owned by the built-in `node` user. `HOSTNAME=0.0.0.0`, `API_URL=http://api:8000`, telemetry disabled.
+- **Changes to the example:** no `public/` copy (the folder does not exist); a short `.dockerignore` of our own.
+- **Why:** `API_URL` has no `NEXT_PUBLIC_` prefix, so it is read by the server at request time: the same image works anywhere by changing one variable. Alpine (smaller) rejected: the example uses slim, and slim matches the glibc of development and CI.
+
+### D08-2 Compose: one public port, the web waits for a healthy API
+- **Choice:** `infra/docker-compose.yml`, project `name: market-basket-analysis` (otherwise Compose names it after the folder, `infra`). `api`: `expose: 8000` and **no `ports`**, `outputs/` read-only, health check on `/health`. `web`: `3000:3000`, `depends_on` with `condition: service_healthy`. Both `restart: unless-stopped`.
+- **Health check:** `python:3.14-slim` has no `curl` or `wget`, so the test runs Python `urllib` (an exception gives exit code 1). Interval 10 s, timeout 3 s, 3 retries, start period 20 s checked every 2 s (Docker defaults: 30 s).
+- **Check:** `curl localhost:8000` from the host fails (connection refused) while the web container reaches `http://api:8000/health`.
+
+### D08-3 No `init: true`
+- **Context:** a process running as PID 1 may ignore `SIGTERM`, and Docker then waits 10 s before killing it.
+- **Measured:** `docker compose down` takes 2.8 s for both containers: uvicorn and the Next.js server stop on `SIGTERM`. `init` is not needed.
