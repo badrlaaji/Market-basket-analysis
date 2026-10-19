@@ -1,5 +1,7 @@
 # Market Basket Analysis
 
+[![CI](https://github.com/badrlaaji/market-basket-analysis/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/badrlaaji/market-basket-analysis/actions/workflows/ci.yml)
+
 > **Work in progress.** Steps 0 to 8 are done: data pipeline, models, REST API, web app and Docker Compose. CI and AWS deployment come next.
 
 ## Problem

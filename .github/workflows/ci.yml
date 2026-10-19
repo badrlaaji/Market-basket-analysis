@@ -1,0 +1,86 @@
+# Tests, lint and builds on every push and pull request.
+# No secret and no data: the pipeline (run_all) is never run here.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Read-only token: no job writes to the repository
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      # API dependencies only, as in the Docker image (no Spark, no XGBoost)
+      - run: pip install -r api/requirements.txt
+      - run: python -m pytest -q tests/test_api.py
+
+  pipeline:
+    name: Pipeline tests and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip # keeps the PySpark wheel built from its 450 MB sdist
+          cache-dependency-path: requirements.txt
+      - run: pip install -r requirements.txt
+      - run: ruff format --check .
+      - run: ruff check .
+      # test_api.py needs FastAPI: it runs in the api job
+      - run: python -m pytest -q --ignore=tests/test_api.py
+
+  web:
+    name: Web lint and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run build # no API needed: every page renders at request time
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Builds both images and validates the compose file; nothing is pushed
+      - run: docker compose -f infra/docker-compose.yml build
+      - run: docker image ls "mba-*"
