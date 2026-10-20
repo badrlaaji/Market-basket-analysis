@@ -5,7 +5,7 @@ import NavLinks from "@/components/NavLinks";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Gift Shop Insights",
+  title: "Market Basket Analysis",
   description:
     "What sells together, who the customers are and who may stop buying, for a UK online gift shop.",
 };
@@ -18,7 +18,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <nav className="site-header-inner" aria-label="Main">
             <Link href="/" className="brand">
               <Logo />
-              Gift Shop Insights
+              Market Basket Analysis
             </Link>
             <NavLinks />
           </nav>

@@ -367,6 +367,7 @@ One entry per decision: context, options, choice, why.
 ### D07c-3 Visual identity taken from the shop, data colours unchanged
 - **Choice:** shopfront green for the structure, one Retrospot red for the main action of a block, a book serif from the system (Palatino Linotype, Georgia as fallback) for answers and big numbers, the basket drawn as a till receipt (CSS mask with two zigzag edges), a polka-dot bag logo. Light and dark tokens.
 - **Kept:** the data colours validated for colour blindness (D07b-6), no web font (C9), no new dependency.
+- **Name kept (owner, 2026-10-20):** the app stays "Market Basket Analysis", like the repository; the name "Gift Shop Insights" tried at this step was dropped.
 
 ### D07c-4 Model page: who came back per tenth of the score
 - **Choice:** the main chart shows, for each tenth of the test customers ranked by score, the share who ordered again (the calibration bins of `model_report.json`, no new output), with the average as a line. The answer sentence uses the top tenth: 93 % against 44 % for all customers. PR/ROC and calibration move to the analyst block.
