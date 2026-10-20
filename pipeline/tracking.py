@@ -1,4 +1,4 @@
-"""Shared MLflow logging: one SQLite database inside mlruns/ (D03-5)."""
+"""Shared MLflow logging: one SQLite database inside mlruns/."""
 
 from pathlib import Path
 

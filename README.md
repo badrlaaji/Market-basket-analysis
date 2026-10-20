@@ -4,8 +4,6 @@
 
 An end-to-end retail analytics project on two years of orders from a UK online gift shop (1,067,371 invoice lines): a PySpark pipeline finds which products sell together, groups the customers, and scores who is about to stop buying; a FastAPI service and a Next.js app turn the results into answers a shop manager can act on.
 
-Built step by step: [`JOURNAL.md`](JOURNAL.md) records what was done and measured at each step, [`DECISIONS.md`](DECISIONS.md) every choice with the alternatives that were rejected.
-
 ## The problem
 
 An online gift retailer wants three answers from its transaction history:
@@ -66,7 +64,7 @@ CI        GitHub Actions on every push: API tests, pipeline tests + ruff, Next.j
 
 ## Results
 
-All figures come from the code of this repository (`JOURNAL.md`, `outputs/stats.json`).
+All figures are measured by the code of this repository.
 
 | Step | Result |
 | --- | --- |
@@ -163,16 +161,6 @@ scripts/       download_data.py, check_spark.py, check_rules.py (5 rules recompu
 .github/       workflows/ci.yml
 docs/img/      screenshots
 ```
-
-## Key technical choices
-
-- **Thresholds chosen by measurement, not by habit.** FP-Growth at minSupport 0.01 (1,166 rules) rather than 0.005 (10,586); k = 4 from the silhouette and the business meaning of the groups. ([D03-1](DECISIONS.md), [D04-2](DECISIONS.md))
-- **Spark checked against pandas.** The cleaned row count, the RFM values and 5 rules match an independent pandas computation. ([D02-6](DECISIONS.md), [D03-7](DECISIONS.md))
-- **No time leak.** Features use only purchases before the reference date, a test proves it, and the model is validated on a later period against a simple recency baseline. ([D05-2](DECISIONS.md))
-- **Heavy work offline, a light API online.** The pipeline writes Parquet files; the API loads them once and filters with pandas, so its image has no Spark, Java or XGBoost. ([D06-1](DECISIONS.md))
-- **The browser never calls FastAPI.** Pages are rendered on the Next.js server and interactive parts go through its `/api/*` routes; in Compose the API has no published port. ([D07-2](DECISIONS.md), [D08-2](DECISIONS.md))
-- **Answers for people who are not data scientists.** Every sentence on screen is built from the data, technical words stay in a glossary, technical charts in a closed block. ([D07c-1](DECISIONS.md))
-- **A safe CI.** GitHub Actions pinned by commit SHA, read-only token, no secret. ([D09-2](DECISIONS.md))
 
 ## Limitations
 

@@ -27,7 +27,7 @@ PROFILES_PARQUET = ROOT / "outputs" / "segment_profiles.parquet"
 K_REPORT_JSON = ROOT / "outputs" / "segments_k_report.json"
 TRANSITIONS_PARQUET = ROOT / "outputs" / "segment_transitions.parquet"
 
-# Choices measured in step 4 (DECISIONS.md D04-1 to D04-4)
+# Settings chosen by measurement (log, k, iterations)
 FEATURES = ["recency", "log_frequency", "log_monetary"]  # skew 12 and 25 before log
 K_RANGE = range(2, 9)  # silhouette logged for each k
 K = 4  # recent or not x high or low value

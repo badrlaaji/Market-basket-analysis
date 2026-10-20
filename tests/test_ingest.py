@@ -10,7 +10,7 @@ from pipeline.ingest import excel_to_parquet, summarize
 
 
 def test_excel_to_parquet_types(tmp_path: Path) -> None:
-    """Mixed codes become text and dates are microseconds, readable by Spark (C2)."""
+    """Mixed codes become text and dates are microseconds, readable by Spark."""
     xlsx = tmp_path / "tiny.xlsx"
     parquet = tmp_path / "tiny.parquet"
     sheet_1 = pd.DataFrame(

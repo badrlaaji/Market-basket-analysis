@@ -31,7 +31,7 @@ SCORES_PARQUET = ROOT / "outputs" / "repurchase_scores.parquet"
 METRICS_JSON = ROOT / "data" / "interim" / "repurchase_metrics.json"
 MODEL_REPORT_JSON = ROOT / "outputs" / "model_report.json"
 
-# Dates fixed in C7 and measured in step 5 (DECISIONS.md D05-1 to D05-3)
+# Out-of-time validation: test on the last 90 days, train on the 90 days before
 HORIZON_DAYS = 90
 TEST_DATE = date(2011, 9, 10)  # T = last invoice date - 90 days
 TRAIN_DATE = TEST_DATE - timedelta(days=HORIZON_DAYS)  # 2011-06-12
@@ -224,7 +224,7 @@ def score_customers(
     scores = pd.DataFrame(
         {"proba_90d": predict(model, features), "monetary": features["monetary"]}
     ).reset_index()
-    # Display only (D06-8): gross monetary + cancellations; not a model feature
+    # Display only: gross monetary + cancellations; not a model feature
     refunds = scores["customer_id"].map(cancelled).fillna(0.0)
     scores["monetary_net"] = scores["monetary"] + refunds
     scores = scores.merge(
@@ -259,7 +259,7 @@ def main() -> None:
     report = model_report(test["label"], proba_test, recency_baseline(test), model)
     MODEL_REPORT_JSON.write_text(json.dumps(report, indent=2))
 
-    # Final scoring with the validated model (D05-3)
+    # Final scoring with the validated model (no retraining on all the data)
     ref_date = score_date(df)
     now = build_features(df, ref_date)
     segments = pd.read_parquet(SEGMENTS_PARQUET)

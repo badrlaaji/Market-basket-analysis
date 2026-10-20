@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW_XLSX = ROOT / "data" / "raw" / "online_retail_II.xlsx"
 RAW_PARQUET = ROOT / "data" / "interim" / "raw.parquet"
 # Columns mix numbers and text (489434, C489449; 4 descriptions are numbers):
-# read them as text, else Parquet fails with ArrowInvalid / ArrowTypeError (C2)
+# read them as text, else Parquet fails with ArrowInvalid / ArrowTypeError
 DTYPES = {"Invoice": str, "StockCode": str, "Description": str}
 
 

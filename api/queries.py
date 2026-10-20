@@ -242,7 +242,7 @@ def in_segment(scores: pd.DataFrame, segment: int | None) -> pd.DataFrame:
 def at_risk(
     scores: pd.DataFrame, threshold: float, top: int, segment: int | None = None
 ) -> tuple[int, float, pd.DataFrame]:
-    """Customers with proba_90d < threshold, highest net value first (D06-8).
+    """Customers with proba_90d < threshold, highest net value first.
 
     Also returns their total net spend (past purchases minus cancellations).
     """

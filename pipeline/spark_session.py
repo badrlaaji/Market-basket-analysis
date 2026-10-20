@@ -1,4 +1,4 @@
-"""Shared local Spark session (decision C4)."""
+"""Shared local Spark session, sized for a laptop."""
 
 from pyspark.sql import SparkSession
 

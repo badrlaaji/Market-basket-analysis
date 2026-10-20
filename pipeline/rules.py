@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLEAN_PARQUET = ROOT / "data" / "interim" / "clean.parquet"
 RULES_PARQUET = ROOT / "outputs" / "rules.parquet"
 
-# Thresholds measured in step 3 (DECISIONS.md D03-1, D03-3)
+# Thresholds chosen by measurement: 0.005 gave 10,586 rules, 0.01 gives 1,166
 MIN_SUPPORT = 0.01  # itemset in at least 396 of the 39,516 invoices
 MIN_CONFIDENCE = 0.2
 MIN_LIFT = 1.5
