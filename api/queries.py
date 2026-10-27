@@ -318,15 +318,21 @@ def at_risk(
     top: int,
     segment: int | None = None,
     sort: str = "spend",
-) -> tuple[int, float, pd.DataFrame]:
+) -> tuple[dict[str, float], pd.DataFrame]:
     """Customers with proba_90d < threshold, by net spend or money at stake.
 
-    Also returns their total net spend (past purchases minus cancellations).
+    Also returns totals over all of them: count, net spend (purchases minus
+    cancellations) and orders.
     """
     risky = in_segment(scores, segment)
     risky = risky[risky["proba_90d"] < threshold]
     risky = risky.sort_values(AT_RISK_SORTS[sort], ascending=False, kind="stable")
-    return len(risky), float(risky["monetary_net"].sum()), risky.head(top)
+    totals = {
+        "total": len(risky),
+        "revenue_at_risk": float(risky["monetary_net"].sum()),
+        "orders": int(risky["frequency"].sum()),
+    }
+    return totals, risky.head(top)
 
 
 def proba_histogram(scores: pd.DataFrame, segment: int | None = None) -> pd.DataFrame:

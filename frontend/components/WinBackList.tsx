@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AnalystDetails from "@/components/AnalystDetails";
+import CampaignEstimate from "@/components/CampaignEstimate";
 import CustomerPanel from "@/components/CustomerPanel";
 import NextStep from "@/components/NextStep";
 import ProbaHistogram from "@/components/ProbaHistogram";
@@ -215,6 +216,8 @@ export default function WinBackList({
             {error}
           </p>
         )}
+
+        <CampaignEstimate page={shown.page} />
 
         <section aria-labelledby="list-title">
           <div className="section-head">

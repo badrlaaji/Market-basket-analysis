@@ -2578,6 +2578,40 @@ main:has(.win-back-layout.has-panel) {
   }
 }
 
+/* ---------- UX Lot 4: campaign estimate ---------- */
+
+/* An assumption the manager picks: in the wash of the advice box, never in red */
+.estimate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin: 0 0 2rem;
+  padding: 1rem 1.25rem;
+  background: var(--accent-wash);
+  border-radius: var(--radius);
+}
+
+.estimate-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.estimate-rate select {
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  font-weight: 650;
+}
+
+.estimate strong {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton {
     animation: none;

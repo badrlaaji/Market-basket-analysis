@@ -233,14 +233,8 @@ def get_at_risk(
     sort: AtRiskSort = "spend",
 ) -> AtRiskPage:
     """Customers unlikely to buy within 90 days, by net spend or money at stake."""
-    total, revenue, customers = queries.at_risk(
-        DATA["scores"], threshold, top, segment, sort
-    )
-    return AtRiskPage(
-        total=total,
-        revenue_at_risk=revenue,
-        customers=to_models(customers, AtRiskCustomer),
-    )
+    totals, customers = queries.at_risk(DATA["scores"], threshold, top, segment, sort)
+    return AtRiskPage(**totals, customers=to_models(customers, AtRiskCustomer))
 
 
 @app.get("/at-risk/export", response_class=Response)
@@ -251,7 +245,7 @@ def export_at_risk(
 ) -> Response:
     """Every customer matching the filters, as a CSV file (no limit)."""
     scores = DATA["scores"]
-    _, _, customers = queries.at_risk(scores, threshold, len(scores), segment, sort)
+    _, customers = queries.at_risk(scores, threshold, len(scores), segment, sort)
     return Response(
         queries.at_risk_csv(customers),
         media_type="text/csv",
