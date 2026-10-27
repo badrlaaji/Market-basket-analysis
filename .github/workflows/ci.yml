@@ -71,6 +71,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
+      - run: npm test # Node's test runner: no test library to install
       - run: npm run build # no API needed: every page renders at request time
 
   docker:

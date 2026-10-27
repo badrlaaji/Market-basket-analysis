@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import NextStep from "@/components/NextStep";
 import RulesExplorer from "@/components/RulesExplorer";
+import SellMoreTabs from "@/components/SellMoreTabs";
 import { fetchApi } from "@/lib/fastapi";
 import { rulesAnswer } from "@/lib/insights";
 import { ALL_RULES_QUERY, DEFAULT_RULE_FILTERS, rulesQuery } from "@/lib/queries";
@@ -24,6 +25,7 @@ export default async function RulesPageView() {
           has that one too. Click “Explain” on a row to read it in plain words.
         </p>
       </header>
+      <SellMoreTabs current="/rules" />
       <NextStep href="/basket" action="Try the basket helper">
         Put the products of the strongest patterns side by side, in the shop and in the
         “customers also bought” block of each product page.

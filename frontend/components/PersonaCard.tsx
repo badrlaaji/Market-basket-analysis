@@ -2,11 +2,12 @@
 import Link from "next/link";
 import Term from "@/components/Term";
 import { formatInt, formatPercent, formatPounds, productName } from "@/lib/format";
-import { segmentBlurb } from "@/lib/insights";
+import { segmentAction, segmentBlurb } from "@/lib/insights";
 import type { SegmentProfile } from "@/lib/types";
 
 /** The selected group as a short profile, its favourite products and an action. */
 export default function PersonaCard({ profile }: { profile: SegmentProfile }) {
+  const action = segmentAction(profile);
   return (
     <div className="persona" aria-live="polite">
       <h2>
@@ -55,8 +56,13 @@ export default function PersonaCard({ profile }: { profile: SegmentProfile }) {
           </li>
         ))}
       </ol>
-      <Link className="button" href={`/win-back?segment=${profile.segment}`}>
-        See which {profile.segment_name} customers to win back
+      {action.advice && (
+        <p className="persona-action">
+          <strong>What to do:</strong> {action.advice}
+        </p>
+      )}
+      <Link className="button button-primary" href={action.href}>
+        {action.label} <span aria-hidden="true">→</span>
       </Link>
     </div>
   );

@@ -5,11 +5,14 @@ import BeforeAfterChart from "@/components/BeforeAfterChart";
 import Logo from "@/components/Logo";
 import Term from "@/components/Term";
 import { formatInt, formatLift, formatPercent, productName } from "@/lib/format";
+import { sameRange } from "@/lib/sameRange";
 import type { Product, Recommendations, Scenario } from "@/lib/types";
 import { useDebounce } from "@/lib/useDebounce";
 
 const MAX_BASKET = 50; // FastAPI bound
-const K = 5;
+const K = 5; // suggestions shown
+const FETCH_K = 20; // asked for (FastAPI maximum): enough left once a range is hidden
+const FALLBACK = 3; // best sellers shown when the basket leads to no pattern
 const CHIPS = 10;
 const BEST_SELLERS = 5; // rows listed before any search
 
@@ -31,7 +34,7 @@ async function recommend(items: string[], signal: AbortSignal): Promise<Recommen
   const response = await fetch("/api/recommend", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ items, k: K }),
+    body: JSON.stringify({ items, k: FETCH_K }),
     signal,
   });
   if (!response.ok) throw new Error(`status ${response.status}`);
@@ -58,6 +61,7 @@ export default function BasketBuilder({
     data: { recommendations: [], unknown_codes: [] },
   });
   const [error, setError] = useState("");
+  const [hideSameRange, setHideSameRange] = useState(false);
 
   const debouncedQ = useDebounce(q.trim());
   const basketKey = basket.map((p) => p.stock_code).join(",");
@@ -93,7 +97,17 @@ export default function BasketBuilder({
   const names = new Map(basket.map((p) => [p.stock_code, p.description]));
   const searching = q.trim() !== search.q;
   const updating = basketKey !== result.key;
-  const recommendations = basket.length > 0 ? result.data.recommendations : [];
+  // "Same range": a variant of a basket product (another jumbo bag): an obvious idea
+  const ranked = (basket.length > 0 ? result.data.recommendations : []).map((item) => ({
+    ...item,
+    same: basket.some((p) => sameRange(p.description, item.description)),
+  }));
+  const recommendations = ranked.filter((item) => !(hideSameRange && item.same)).slice(0, K);
+  const allSameRange = recommendations.length > 0 && recommendations.every((item) => item.same);
+  const hiddenAll = hideSameRange && ranked.length > 0 && recommendations.length === 0;
+  const fallback = popular.filter((p) => !inBasket.has(p.stock_code)).slice(0, FALLBACK);
+  const basketName =
+    basket.length === 1 ? `“${productName(basket[0].description)}”` : "this basket";
   const silent = basket.filter((p) => !p.in_rules).length;
   const maxLift = Math.max(1, ...recommendations.map((r) => r.lift));
   const chips = popular.filter((p) => p.in_rules).slice(0, CHIPS);
@@ -249,21 +263,57 @@ export default function BasketBuilder({
             )}
 
             <div className="receipt-section" aria-live="polite">
-              <h3 id="suggestions">Customers often add</h3>
+              <div className="receipt-section-head">
+                <h3 id="suggestions">Customers often add</h3>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={hideSameRange}
+                    onChange={(e) => setHideSameRange(e.target.checked)}
+                  />
+                  Hide the same range
+                </label>
+              </div>
               {error && <p className="error-text">{error}</p>}
               {basket.length === 0 && (
                 <p className="empty">Suggestions appear here once the basket has a product.</p>
               )}
-              {basket.length > 0 && !updating && recommendations.length === 0 && (
+              {hiddenAll && !updating && (
                 <p className="empty">
-                  No suggestion for this basket yet. Add a product that “leads to suggestions”.
+                  Every suggestion is from the same range as the basket. Turn off “Hide the same
+                  range” to see them.
                 </p>
+              )}
+              {basket.length > 0 && !updating && ranked.length === 0 && (
+                <div className="fallback">
+                  <h4>No buying pattern for {basketName} yet</h4>
+                  <p className="note">
+                    It appears in too few orders. Best sellers instead:{" "}
+                    <strong>these are not a buying pattern.</strong>
+                  </p>
+                  <ul className="product-list">
+                    {fallback.map((product) => (
+                      <li key={product.stock_code}>
+                        <span className="name">{productName(product.description)}</span>
+                        <button
+                          type="button"
+                          onClick={() => add(product)}
+                          aria-label={`Add ${productName(product.description)} to the basket`}
+                        >
+                          Add
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               <div className={updating ? "is-loading" : undefined}>
                 {recommendations.map((item) => (
                   <article className="suggestion" key={item.stock_code}>
                     <div className="suggestion-head">
                       <h4>{productName(item.description)}</h4>
+                      {item.same && <span className="badge">Same range</span>}
                       <button
                         type="button"
                         onClick={() =>
@@ -297,6 +347,12 @@ export default function BasketBuilder({
                   </article>
                 ))}
               </div>
+              {allSameRange && !hideSameRange && !updating && (
+                <p className="callout">
+                  All suggestions come from the same range as your basket. Turn on “Hide the
+                  same range” to look for other ideas.
+                </p>
+              )}
             </div>
 
             <p className="receipt-foot">

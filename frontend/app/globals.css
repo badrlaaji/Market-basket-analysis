@@ -2329,6 +2329,255 @@ main:has(.win-back-layout.has-panel) {
   }
 }
 
+/* ---------- UX Lot 3: Sell more, This week, Customers ---------- */
+
+/* Sell more: two views as tabs, each with its own address */
+.page-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: -0.75rem 0 1.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.page-tabs a {
+  padding: 0.6rem 1rem;
+  border-bottom: 3px solid transparent;
+  color: var(--ink-2);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.page-tabs a:hover {
+  color: var(--ink);
+}
+
+.page-tabs a[aria-current] {
+  border-bottom-color: var(--pop);
+  color: var(--ink);
+}
+
+.receipt-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+/* A checkbox drawn as a switch (role="switch"): same input, same keyboard */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font);
+  font-size: var(--step--1);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.switch input {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 2.25rem;
+  height: 1.3rem;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--rule);
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+
+.switch input::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: transform 120ms;
+}
+
+.switch input:checked {
+  background: var(--accent);
+}
+
+.switch input:checked::after {
+  transform: translateX(0.95rem);
+}
+
+.suggestion-head h4 {
+  flex: 1;
+}
+
+.receipt-section .callout {
+  margin: 0.75rem 0 0;
+  border-left: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent-wash);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--step--1);
+}
+
+.fallback {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+}
+
+.fallback h4 {
+  margin: 0;
+}
+
+/* This week: three actions, most urgent first (only card 1 in Retrospot red) */
+.action-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 0 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-top: 4px solid var(--brand);
+  border-radius: var(--radius);
+}
+
+.action-card.is-urgent {
+  border-top-color: var(--pop);
+}
+
+.action-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--accent);
+  font-size: var(--step--1);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.is-urgent .action-kicker {
+  color: var(--pop);
+}
+
+.action-number {
+  display: inline-grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: var(--accent-wash);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-urgent .action-number {
+  background: var(--pop-wash);
+}
+
+.action-card h2 {
+  font-size: var(--step-1);
+  text-wrap: balance;
+}
+
+.action-text {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  line-height: 1.4;
+}
+
+.action-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: 0.5rem;
+}
+
+/* Four key figures in one framed row */
+.key-figures {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 2rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.key-figures div {
+  display: flex;
+  flex-direction: column; /* the number first, its label under it */
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-top: 0;
+}
+
+.key-figures div + div {
+  border-left: 1px solid var(--rule);
+}
+
+.key-figures dt {
+  order: 2;
+  font-weight: 400;
+}
+
+/* "Can I trust these numbers?": the proof in one sentence, then the link */
+.trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  margin-top: 2rem;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.trust-strip a {
+  font-weight: 600;
+}
+
+.persona-action {
+  margin: 0.25rem 0 0.75rem;
+}
+
+@media (max-width: 52rem) {
+  .action-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .key-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .key-figures div:nth-child(3) {
+    border-left: 0;
+  }
+
+  .key-figures div:nth-child(n + 3) {
+    border-top: 1px solid var(--rule);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton {
     animation: none;
