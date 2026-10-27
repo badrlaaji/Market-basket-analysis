@@ -22,19 +22,19 @@ _Demo video (2 min): coming soon._
 | [![The basket as a till receipt, with the products customers often add](docs/img/web-basket.png)](docs/img/web-basket.png) | [![Share of customers against share of spending, and the card of a group](docs/img/web-segments.png)](docs/img/web-segments.png) | [![Share of customers who came back, per tenth of the score](docs/img/web-model.png)](docs/img/web-model.png) |
 
 <details>
-<summary>More screenshots: summary, bought together, win back, dark theme, phone</summary>
+<summary>More screenshots: this week, win back with the customer card, buying patterns, dark theme, phone</summary>
 
-![Summary page: the answer in one sentence, three business questions and the monthly sales](docs/img/web-overview.png)
+![This week: three actions, most urgent first, key figures and the monthly sales](docs/img/web-overview.png)
 
-![Bought together: the patterns that match and the selected one in plain words](docs/img/web-rules.png)
+![All buying patterns: the patterns that match and the selected one in plain words](docs/img/web-rules.png)
 
-![Win back: chance-of-ordering slider and customers to contact](docs/img/web-win-back.png)
+![Win back: who to call first by money at stake, a campaign estimate, and the card of customer 16754 beside the list](docs/img/web-win-back.png)
 
-![Summary page, dark theme](docs/img/web-overview-dark.png)
+![This week, dark theme](docs/img/web-overview-dark.png)
 
 ![Customer groups in the dark theme](docs/img/web-segments-dark.png)
 
-<img src="docs/img/web-rules-mobile.png" alt="Bought together page on a phone" width="260"> <img src="docs/img/web-win-back-mobile.png" alt="Win back page on a phone" width="260">
+<img src="docs/img/web-win-back-mobile.png" alt="Win back on a phone: customers as cards, menu at the thumb" width="260"> <img src="docs/img/web-card-mobile.png" alt="Customer card full screen on a phone, with Previous, Copy and Next" width="260"> <img src="docs/img/web-rules-mobile.png" alt="Buying patterns on a phone" width="260">
 
 </details>
 
@@ -75,7 +75,7 @@ All figures are measured by the code of this repository.
 | REST API (FastAPI) | 16 endpoints; `/recommend` answers in about 9 ms (in-process); invalid parameters return `422`. |
 | Web app (Next.js) | 6 pages, one business question each, written for non-specialists: an answer sentence built from the data, one piece of advice, the technical charts in a closed analyst block. A scripted browser run in light, dark and phone width: 0 console errors, every request sent to the Next.js server only. |
 | Packaging | Docker images `mba-api` 646 MB and `mba-web` 389 MB; 127 and 75 MiB of memory after loading every page; `compose up --build` in 57 s; only the web port is published. |
-| Tests and CI | 88 pytest tests on tiny hand-made datasets; 4 parallel CI jobs, about 2 minutes per run. |
+| Tests and CI | 109 pytest tests on tiny hand-made datasets, plus 4 web tests (20 product pairs checked by hand) with Node's test runner; 4 parallel CI jobs. |
 
 ## Quick start
 
@@ -144,7 +144,7 @@ Parameters are validated (for example `min_confidence` and `threshold` in [0, 1]
 | `/rules` (Sell more, tab "All buying patterns") | Which products sell together? | Filter by product, how often and strength; read a pattern in plain words; CSV download. Analysts: map of every rule, flows, one product's rules, distributions |
 | `/basket` Sell more | What else goes in this basket? | Example baskets, popular products, search; the basket as a receipt with "customers often add"; a "Same range" badge on variants of a basket product and a switch to hide them; best sellers, labelled, when the basket leads to no pattern |
 | `/segments` Customers | Who are the customers? | Share of customers against share of spending, a card per group with one action and a button to its win-back list (`?segment=` keeps the group). Analysts: scatter, radar, RFM grid, treemap, 90-day moves, silhouette per k |
-| `/win-back` Win back | Who is about to stop buying? | Chance-of-ordering slider, filter by group, contact first by money at stake or by spend, last order, CSV download; the filters stay in the address. A click opens the customer card beside the list (full screen on a phone): why now, what they buy and no longer buy, what to offer, Previous / Next. Analysts: probability histogram |
+| `/win-back` Win back | Who is about to stop buying? | Chance-of-ordering slider, filter by group, contact first by money at stake or by spend, last order, CSV download, a campaign estimate from a rate you choose (an assumption, not a forecast); the filters stay in the address. A click opens the customer card beside the list (full screen on a phone): why now, what they buy and no longer buy, what to offer, Previous / Next. Analysts: probability histogram |
 | `/model` (footer link: Can I trust these numbers?) | Can we trust the score? | Share of customers who came back per tenth of the score, what the score looks at. Analysts: PR and ROC curves, calibration |
 
 </details>

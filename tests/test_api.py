@@ -435,6 +435,7 @@ def test_at_risk_threshold_sort_and_top(client: TestClient) -> None:
     body = client.get("/at-risk?threshold=0.3&top=2").json()
     assert body["total"] == 4
     assert body["revenue_at_risk"] == 450.0  # net: 300 + 0 + 100 + 50, all 4 counted
+    assert body["orders"] == 10  # invoices of all 4: 1 + 2 + 1 + 6, before the limit
     assert [c["customer_id"] for c in body["customers"]] == [102, 104]
     assert all(isinstance(c["customer_id"], int) for c in body["customers"])
     assert body["customers"][0]["segment_name"] == "Lost"

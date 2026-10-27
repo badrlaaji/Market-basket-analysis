@@ -219,6 +219,9 @@ class AtRiskCustomer(BaseModel):
 class AtRiskPage(BaseModel):
     total: int  # customers below the threshold, before the limit
     revenue_at_risk: float  # their total net spend over the 2 years of data
+    orders: (
+        int  # their total number of orders (invoices): net spend / orders = order value
+    )
     customers: list[AtRiskCustomer]
 
 

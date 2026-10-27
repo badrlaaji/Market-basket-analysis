@@ -187,6 +187,7 @@ export type AtRiskSort = "stake" | "spend";
 export type AtRiskPage = {
   total: number; // customers below the threshold, before the limit
   revenue_at_risk: number; // their total net spend over the 2 years of data
+  orders: number; // their total number of orders
   customers: AtRiskCustomer[];
 };
 
