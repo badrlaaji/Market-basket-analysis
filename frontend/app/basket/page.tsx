@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import BasketBuilder from "@/components/BasketBuilder";
+import SellMoreTabs from "@/components/SellMoreTabs";
 import { fetchApi } from "@/lib/fastapi";
 import { formatInt } from "@/lib/format";
 import type { Product, Scenario, Stats } from "@/lib/types";
@@ -25,6 +26,7 @@ export default async function BasketPage() {
           lead to one; the others appear in too few orders to show a clear pattern.
         </p>
       </header>
+      <SellMoreTabs current="/basket" />
       <BasketBuilder
         popular={popular}
         scenarios={scenarios}

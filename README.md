@@ -140,10 +140,10 @@ Parameters are validated (for example `min_confidence` and `threshold` in [0, 1]
 
 | Page (menu) | Question | What you can do |
 | --- | --- | --- |
-| `/` This week | What do two years of orders say? | Three questions with their answer, monthly sales with the peaks, four key figures |
-| `/rules` (in Sell more) | Which products sell together? | Filter by product, how often and strength; read a pattern in plain words; CSV download. Analysts: map of every rule, flows, one product's rules, distributions |
-| `/basket` Sell more | What else goes in this basket? | Example baskets, popular products, search; the basket as a receipt with "customers often add" |
-| `/segments` Customers | Who are the customers? | Share of customers against share of spending, a card per group. Analysts: scatter, radar, RFM grid, treemap, 90-day moves, silhouette per k |
+| `/` This week | What should I do this week? | Three actions, most urgent first (call, sell more, look after the best group), each opening its page already filtered; four key figures, monthly sales, and the proof that the score can be trusted |
+| `/rules` (Sell more, tab "All buying patterns") | Which products sell together? | Filter by product, how often and strength; read a pattern in plain words; CSV download. Analysts: map of every rule, flows, one product's rules, distributions |
+| `/basket` Sell more | What else goes in this basket? | Example baskets, popular products, search; the basket as a receipt with "customers often add"; a "Same range" badge on variants of a basket product and a switch to hide them; best sellers, labelled, when the basket leads to no pattern |
+| `/segments` Customers | Who are the customers? | Share of customers against share of spending, a card per group with one action and a button to its win-back list (`?segment=` keeps the group). Analysts: scatter, radar, RFM grid, treemap, 90-day moves, silhouette per k |
 | `/win-back` Win back | Who is about to stop buying? | Chance-of-ordering slider, filter by group, contact first by money at stake or by spend, last order, CSV download; the filters stay in the address. A click opens the customer card beside the list (full screen on a phone): why now, what they buy and no longer buy, what to offer, Previous / Next. Analysts: probability histogram |
 | `/model` (footer link: Can I trust these numbers?) | Can we trust the score? | Share of customers who came back per tenth of the score, what the score looks at. Analysts: PR and ROC curves, calibration |
 

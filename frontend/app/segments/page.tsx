@@ -3,11 +3,12 @@ import NextStep from "@/components/NextStep";
 import SegmentsView from "@/components/SegmentsView";
 import { fetchApi } from "@/lib/fastapi";
 import { segmentsAnswer } from "@/lib/insights";
+import { parseSegment } from "@/lib/queries";
 import type { GridCell, KReport, MapPoint, SegmentProfile, Transitions } from "@/lib/types";
 
 const MAP_POINTS = 1500; // enough to see the shapes, light enough for the browser
 
-export default async function SegmentsPage() {
+export default async function SegmentsPage({ searchParams }: PageProps<"/segments">) {
   await connection(); // render at request time: no FastAPI call during next build
   const [profiles, points, cells, kReport, transitions] = await Promise.all([
     fetchApi<SegmentProfile[]>("/segments"),
@@ -16,6 +17,8 @@ export default async function SegmentsPage() {
     fetchApi<KReport>("/segments/k"),
     fetchApi<Transitions>("/segments/transitions"),
   ]);
+  const requested = parseSegment((await searchParams).segment);
+  const initialSegment = profiles.some((p) => p.segment === requested) ? requested : null;
 
   return (
     <main>
@@ -37,6 +40,7 @@ export default async function SegmentsPage() {
         cells={cells}
         kReport={kReport}
         transitions={transitions}
+        initialSegment={initialSegment}
       />
     </main>
   );

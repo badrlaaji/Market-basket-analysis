@@ -9,6 +9,7 @@ import {
   productName,
 } from "@/lib/format";
 import type {
+  AtRiskPage,
   CalibrationBin,
   ModelMetrics,
   Month,
@@ -17,20 +18,6 @@ import type {
   Stats,
 } from "@/lib/types";
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 /** Complete months, highest revenue first (a partial month is never a peak). */
 export function peakMonths(months: Month[], count: number = 2): Month[] {
@@ -46,23 +33,12 @@ export function averageMonth(months: Month[]): number {
   return complete.reduce((sum, month) => sum + month.revenue, 0) / complete.length;
 }
 
-/** "November" when every peak falls in the same calendar month, else null. */
-function sharedPeakMonth(peaks: Month[]): string | null {
-  const numbers = new Set(peaks.map((peak) => peak.month.slice(5)));
-  return numbers.size === 1 ? MONTH_NAMES[Number([...numbers][0]) - 1] : null;
-}
 
 /** Segment with the largest share of the revenue. */
 export function topRevenueSegment(profiles: SegmentProfile[]): SegmentProfile {
   return profiles.reduce((best, p) => (p.revenue_share > best.revenue_share ? p : best));
 }
 
-/** Share of the revenue that has no customer ID (guest orders). */
-export function guestShare(months: Month[], profiles: SegmentProfile[]): number {
-  const total = months.reduce((sum, month) => sum + month.revenue, 0);
-  const known = profiles.reduce((sum, p) => sum + p.monetary_mean * p.n_customers, 0);
-  return 1 - known / total;
-}
 
 /** "Jumbo bag red retrospot" or "A, B and C". */
 export function productList(names: string[]): string {
@@ -72,31 +48,8 @@ export function productList(names: string[]): string {
     : readable[0];
 }
 
-/** "a basket with Jumbo bag red retrospot" or "a basket with A and B". */
-export function basketWith(names: string[]): string {
-  return `a basket with ${productList(names)}`;
-}
 
-/** Home page answer: when sales peak and who brings them. */
-export function overviewAnswer(months: Month[], profiles: SegmentProfile[]): string {
-  const peaks = peakMonths(months);
-  const shared = sharedPeakMonth(peaks);
-  const when = shared ? `peak every ${shared}` : `peaked in ${formatMonth(peaks[0].month)}`;
-  const top = topRevenueSegment(profiles);
-  return (
-    `Sales ${when}, and ${formatPercent(top.customer_share, 0)} of the customers ` +
-    `bring ${formatPercent(top.revenue_share, 0)} of the spending.`
-  );
-}
 
-/** Insight: spending concentrated in one group of customers. */
-export function concentrationInsight(profiles: SegmentProfile[]): string {
-  const top = topRevenueSegment(profiles);
-  return (
-    `${top.segment_name} are ${formatPercent(top.customer_share, 0)} of the customers ` +
-    `but bring ${formatPercent(top.revenue_share, 0)} of the spending.`
-  );
-}
 
 /** Insight: the best month against an average month. */
 export function seasonalityInsight(months: Month[]): string {
@@ -108,11 +61,28 @@ export function seasonalityInsight(months: Month[]): string {
   );
 }
 
-/** Home card: how many customers may stop buying, at the default threshold. */
-export function winBackInsight(total: number, threshold: number): string {
+/** This week, card 1: who may stop buying, and what they spent. */
+export function winBackInsight(page: AtRiskPage, threshold: number): string {
   return (
-    `${formatInt(total)} customers have less than a ${formatPercent(threshold, 0)} chance ` +
-    `of ordering again in the next 90 days.`
+    `${formatInt(page.total)} customers have less than a ${formatPercent(threshold, 0)} ` +
+    `chance of ordering again. Together they spent ${formatCompactPounds(page.revenue_at_risk)}.`
+  );
+}
+
+/** This week, card 2: how many buying patterns, and where to use them. */
+export function sellMoreInsight(stats: Stats): string {
+  return (
+    `${formatInt(stats.rules)} buying patterns link ${formatInt(stats.products_in_rules)} ` +
+    `products. Use them in the basket and on product pages.`
+  );
+}
+
+/** This week, card 3: the group that brings the most, and its typical last order. */
+export function lookAfterInsight(top: SegmentProfile): string {
+  return (
+    `${formatPercent(top.customer_share, 0)} of the customers bring ` +
+    `${formatPercent(top.revenue_share, 0)} of the spending. A typical one ordered ` +
+    `${formatInt(Math.round(top.recency_median))} days ago.`
   );
 }
 
@@ -129,19 +99,42 @@ export function segmentBlurb(name: string): string {
   return SEGMENT_BLURBS[name] ?? "";
 }
 
-/** "a basket…" → "A basket…". */
-function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+// One action per group, and the win-back list it opens (already filtered)
+const SEGMENT_ACTIONS: Record<string, { advice: string; label: string; sort?: string }> = {
+  Champions: {
+    advice: "Keep them: show them the new products first, and thank them.",
+    label: "See the Champions who may stop buying",
+  },
+  Promising: {
+    advice: "Encourage the next order while the first ones are fresh.",
+    label: "See the Promising customers to call",
+  },
+  "At risk": {
+    advice: "Contact them now, with a personal offer.",
+    label: "Contact them",
+  },
+  Lost: {
+    advice: "Low priority: spend little effort, and only on the biggest past spenders.",
+    label: "Only the big spenders",
+    sort: "spend",
+  },
+};
+
+/** The advice for a group and the link to its win-back list. */
+export function segmentAction(profile: SegmentProfile): {
+  advice: string;
+  label: string;
+  href: string;
+} {
+  const action = SEGMENT_ACTIONS[profile.segment_name] ?? {
+    advice: "",
+    label: `See which ${profile.segment_name} customers to win back`,
+  };
+  const sort = action.sort ? `&sort=${action.sort}` : "";
+  return { ...action, href: `/win-back?segment=${profile.segment}${sort}` };
 }
 
-/** Insight: a rule in plain words. */
-export function ruleSentence(rule: Rule): string {
-  return (
-    `${capitalize(basketWith(rule.antecedent_names))} also has ` +
-    `${productName(rule.consequent_name)} ${formatLift(rule.lift)} more often than an ` +
-    `average basket.`
-  );
-}
+
 
 /** /rules answer: how many patterns, and how strong the best one is. */
 export function rulesAnswer(stats: Stats, strongest: Rule): string {

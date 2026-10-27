@@ -1,6 +1,6 @@
 "use client"; // the selected group drives the persona card and the analyst charts
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AnalystDetails from "@/components/AnalystDetails";
 import MigrationFlows from "@/components/MigrationFlows";
 import PersonaCard from "@/components/PersonaCard";
@@ -23,15 +23,25 @@ export default function SegmentsView({
   cells,
   kReport,
   transitions,
+  initialSegment,
 }: {
+  initialSegment: number | null; // from the address (?segment=0), if it exists
   profiles: SegmentProfile[];
   points: MapPoint[];
   cells: GridCell[];
   kReport: KReport;
   transitions: Transitions;
 }) {
-  const [segment, setSegment] = useState(topRevenueSegment(profiles).segment);
+  const [segment, setSegment] = useState(initialSegment ?? topRevenueSegment(profiles).segment);
   const selected = profiles.find((p) => p.segment === segment) ?? profiles[0];
+
+  // The chosen group stays in the address: a link opens the same group
+  useEffect(() => {
+    const search = `?segment=${segment}`;
+    if (window.location.search !== search) {
+      window.history.replaceState(null, "", `${window.location.pathname}${search}`);
+    }
+  }, [segment]);
 
   return (
     <>
