@@ -1,5 +1,7 @@
 """Pydantic schemas: the /recommend body and every response of the API."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 MAX_BASKET = 50  # products per basket
@@ -225,3 +227,50 @@ class HistogramBin(BaseModel):
     end: float
     n_customers: int
     monetary_net: float
+
+
+class CardProduct(BaseModel):
+    stock_code: str
+    description: str
+    n_orders: int  # orders of the customer with this product
+
+
+class LostProduct(BaseModel):
+    stock_code: str
+    description: str
+    n_orders: int
+    usual_gap_days: float  # median days between two orders of the product
+    days_since: int  # days since the customer last bought it
+
+
+class Offer(BaseModel):
+    stock_code: str
+    description: str
+    kind: Literal["pattern", "best_seller"]  # best seller: not a buying pattern
+    confidence: float | None  # pattern only: P(product | his products)
+    lift: float | None
+    because: list[str]  # names of the products that lead to it (pattern only)
+
+
+class CustomerCard(BaseModel):
+    customer_id: int
+    segment: int
+    segment_name: str
+    country: str
+    first_order: str  # "2010-03-08"
+    n_orders: int  # distinct invoices
+    n_order_days: int  # distinct days with an order
+    recency: int  # days since the last order
+    usual_gap_days: float | None  # median gap between order days; None: 1 day only
+    overdue: bool | None  # recency > 1.5 x usual gap; None without a rhythm
+    rough_rhythm: bool  # fewer than 4 order days: the gap is a rough guide
+    proba_90d: float
+    risk_decile: int  # 1 = lowest tenth of the scores (most likely to leave)
+    risk_level: Literal["high", "medium", "low"]  # deciles 1-3, 4-7, 8-10
+    monetary: float
+    monetary_net: float
+    stake: float
+    average_order: float  # net spend / orders
+    products: list[CardProduct]  # what they usually buy (top 3)
+    lost_products: list[LostProduct]
+    offers: list[Offer]

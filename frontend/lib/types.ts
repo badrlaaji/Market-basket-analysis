@@ -196,3 +196,45 @@ export type HistogramBin = {
   n_customers: number;
   monetary_net: number;
 };
+
+export type CardProduct = { stock_code: string; description: string; n_orders: number };
+
+export type LostProduct = CardProduct & {
+  usual_gap_days: number; // median days between two orders of the product
+  days_since: number; // days since the customer last bought it
+};
+
+export type Offer = {
+  stock_code: string;
+  description: string;
+  kind: "pattern" | "best_seller"; // best seller: not a buying pattern
+  confidence: number | null;
+  lift: number | null;
+  because: string[]; // names of the products that lead to it (pattern only)
+};
+
+export type RiskLevel = "high" | "medium" | "low";
+
+export type CustomerCard = {
+  customer_id: number;
+  segment: number;
+  segment_name: string;
+  country: string;
+  first_order: string; // "2010-03-08"
+  n_orders: number;
+  n_order_days: number;
+  recency: number;
+  usual_gap_days: number | null; // null: one order day only
+  overdue: boolean | null; // last order > 1.5 × usual gap ago
+  rough_rhythm: boolean; // fewer than 4 order days
+  proba_90d: number;
+  risk_decile: number; // 1 = lowest tenth of the scores
+  risk_level: RiskLevel;
+  monetary: number;
+  monetary_net: number;
+  stake: number;
+  average_order: number;
+  products: CardProduct[];
+  lost_products: LostProduct[];
+  offers: Offer[];
+};

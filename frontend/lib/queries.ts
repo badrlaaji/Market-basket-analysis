@@ -26,7 +26,12 @@ export const THRESHOLD_MIN = 0.05;
 export const THRESHOLD_MAX = 0.9;
 export const THRESHOLD_STEP = 0.05;
 
-export type WinBackState = { threshold: number; segment: number | null; sort: AtRiskSort };
+export type WinBackState = {
+  threshold: number;
+  segment: number | null;
+  sort: AtRiskSort;
+  customer: number | null; // customer card open, if any
+};
 type Param = string | string[] | undefined;
 
 /** First value of a search parameter ("?a=1&a=2" → "1"). */
@@ -49,6 +54,12 @@ export function parseSegment(value: Param): number | null {
   return text !== undefined && /^\d{1,3}$/.test(text) ? Number(text) : null;
 }
 
+/** "16754" → 16754; anything but digits → null (no card open). */
+export function parseCustomer(value: Param): number | null {
+  const text = first(value);
+  return text !== undefined && /^\d{1,9}$/.test(text) ? Number(text) : null;
+}
+
 /** "spend" or "stake"; anything else → the default sort. */
 export function parseSort(value: Param): AtRiskSort {
   const text = first(value);
@@ -61,6 +72,7 @@ export function parseWinBack(params: Record<string, Param>): WinBackState {
     threshold: parseThreshold(params.threshold),
     segment: parseSegment(params.segment),
     sort: parseSort(params.sort),
+    customer: parseCustomer(params.customer),
   };
 }
 
@@ -70,6 +82,7 @@ export function winBackSearch(state: WinBackState): string {
   if (state.threshold !== DEFAULT_THRESHOLD) params.set("threshold", state.threshold.toFixed(2));
   if (state.segment !== null) params.set("segment", String(state.segment));
   if (state.sort !== DEFAULT_AT_RISK_SORT) params.set("sort", state.sort);
+  if (state.customer !== null) params.set("customer", String(state.customer));
   const text = params.toString();
   return text ? `?${text}` : "";
 }

@@ -130,8 +130,10 @@ summary {
   top: 0.5rem;
 }
 
-#content:focus {
-  outline: none; /* focused only by the skip link, never by a click */
+/* Focused by script only (skip link target, card title): no ring, the next Tab shows one */
+#content:focus,
+[tabindex="-1"]:focus {
+  outline: none;
 }
 
 :focus-visible {
@@ -1859,6 +1861,471 @@ tr.is-selected > * {
 
   .brand {
     padding-bottom: 0.25rem;
+  }
+}
+
+/* ---------- UX Lot 2: customer card, phone layout ---------- */
+
+/* Win back: the list and the open card side by side on a computer */
+main:has(.win-back-layout.has-panel) {
+  max-width: 92rem;
+}
+
+.win-back-layout.has-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem);
+  gap: 2rem;
+  align-items: start;
+}
+
+.win-back-main {
+  min-width: 0;
+}
+
+.win-back-table tbody tr {
+  cursor: pointer;
+}
+
+.win-back-table tbody tr:hover > * {
+  background: var(--bg);
+}
+
+.row-open,
+.row-open:hover {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  font-variant-numeric: tabular-nums;
+}
+
+.customer-panel {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.panel-scroll {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.25rem;
+}
+
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panel-head h2 {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 400;
+}
+
+.icon-button {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  color: var(--ink-2);
+  font-size: var(--step--1);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--ink);
+}
+
+.chip .swatch,
+.win-back-table .swatch {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+}
+
+.card-why {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink-2);
+  font-family: var(--font);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.badge-pattern {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.badge-alert {
+  background: var(--pop-wash);
+  color: var(--pop);
+}
+
+.card-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-figures > div {
+  padding: 0.7rem 0.8rem;
+}
+
+.card-figures > div + div {
+  border-left: 1px solid var(--rule);
+}
+
+.card-figures .is-stake {
+  background: var(--pop-wash);
+}
+
+.card-figures dt {
+  color: var(--ink-2);
+  font-size: var(--step--1);
+}
+
+.card-figures dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.card-figures dd.note {
+  font-family: var(--font);
+  font-size: 0.75rem;
+}
+
+.panel-scroll h3 {
+  margin-top: 0.4rem;
+  font-size: var(--step-0);
+}
+
+.card-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+}
+
+.card-list li span {
+  display: block;
+  white-space: normal;
+}
+
+.offers {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.offer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+}
+
+.offer.is-fallback {
+  border-style: dashed;
+}
+
+.offer-name {
+  font-weight: 600;
+}
+
+.panel-actions {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 0.5rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+}
+
+.panel-actions button {
+  min-height: 2.75rem;
+}
+
+.skeleton-card {
+  height: 22rem;
+}
+
+/* Phone: the card fills the screen; Previous / Copy / Next stay at the thumb */
+.customer-dialog {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  color: var(--ink);
+  overscroll-behavior: contain;
+}
+
+.customer-dialog::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+
+.customer-dialog .panel-scroll {
+  min-height: 100%;
+  padding-bottom: 0;
+}
+
+.customer-dialog .panel-actions {
+  position: sticky;
+  bottom: 0;
+  padding-bottom: calc(0.9rem + env(safe-area-inset-bottom));
+  background: var(--surface);
+}
+
+/* The list as cards, only on a phone */
+.customer-cards {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-icon {
+  display: none;
+}
+
+@media (max-width: 52rem) {
+  .win-back-layout.has-panel {
+    display: block;
+  }
+
+  /* Phone: the list comes right after the answer; the advice is the list itself */
+  .win-back-main .page-head .lede,
+  .win-back-main .next-step {
+    display: none;
+  }
+
+  .win-back-main .page-head {
+    margin-bottom: 1.25rem;
+  }
+
+  .win-back-main .controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .win-back-main .controls > :first-child,
+  .win-back-main .controls > .button {
+    grid-column: 1 / -1;
+  }
+
+  .win-back-main .controls input[type="range"] {
+    width: 100%;
+  }
+
+  .win-back-main .controls select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .win-back-main .controls > .button {
+    text-align: center;
+  }
+
+  .table-wrap:has(.win-back-table) {
+    display: none;
+  }
+
+  .customer-cards {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .customer-cards button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "id stake"
+      "meta label"
+      "last chevron";
+    gap: 0.3rem 1rem;
+    width: 100%;
+    padding: 1rem 1.1rem;
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: var(--step-0);
+    text-align: left;
+  }
+
+  .customer-cards button[aria-current] {
+    border-color: var(--accent);
+  }
+
+  .cc-id {
+    grid-area: id;
+    font-size: var(--step-1);
+    font-weight: 700;
+  }
+
+  .cc-stake {
+    grid-area: stake;
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    line-height: 1.1;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cc-meta,
+  .cc-label,
+  .cc-last {
+    color: var(--ink-2);
+  }
+
+  .cc-meta {
+    grid-area: meta;
+  }
+
+  .cc-label {
+    grid-area: label;
+    text-align: right;
+  }
+
+  .cc-last {
+    grid-area: last;
+  }
+
+  .cc-chevron {
+    grid-area: chevron;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* Menu at the thumb: the 4 tasks in a bar at the bottom */
+  body {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
+  .site-header nav {
+    position: fixed;
+    z-index: 20;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+  }
+
+  .nav {
+    flex-wrap: nowrap;
+  }
+
+  .nav li {
+    flex: 1;
+  }
+
+  .nav a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.5rem 0.25rem;
+    border-top: 3px solid transparent;
+    border-bottom: 0;
+    color: var(--ink-2);
+    opacity: 1;
+    font-size: 0.75rem;
+  }
+
+  .nav a:hover {
+    background: var(--bg);
+  }
+
+  .nav a[aria-current] {
+    border-top-color: var(--pop);
+    color: var(--pop);
+    font-weight: 650;
+  }
+
+  .site-header nav :focus-visible {
+    outline-color: var(--focus); /* the bar is light: the red ring shows */
+  }
+
+  .nav-icon {
+    display: block;
+    width: 1.4rem;
+    height: 1.4rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .data-date {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Small phone: the logo alone, so the date fits on the same line */
+@media (max-width: 30rem) {
+  .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .brand {
+    padding: 0.6rem 0;
   }
 }
 

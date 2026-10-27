@@ -1,7 +1,8 @@
 """Small outputs for the API.
 
 outputs/products.parquet, outputs/stats.json, outputs/monthly_sales.parquet,
-outputs/segment_top_products.parquet
+outputs/segment_top_products.parquet, and the customer card files
+(customer_profiles, customer_products, lost_products: see customers.py)
 """
 
 import json
@@ -9,6 +10,8 @@ from pathlib import Path
 
 import pandas as pd
 import pyarrow.parquet as pq
+
+from pipeline import customers
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW_PARQUET = ROOT / "data" / "interim" / "raw.parquet"
@@ -20,8 +23,11 @@ PRODUCTS_PARQUET = ROOT / "outputs" / "products.parquet"
 STATS_JSON = ROOT / "outputs" / "stats.json"
 MONTHLY_PARQUET = ROOT / "outputs" / "monthly_sales.parquet"
 TOP_PRODUCTS_PARQUET = ROOT / "outputs" / "segment_top_products.parquet"
+CUSTOMER_PROFILES_PARQUET = ROOT / "outputs" / "customer_profiles.parquet"
+CUSTOMER_PRODUCTS_PARQUET = ROOT / "outputs" / "customer_products.parquet"
+LOST_PRODUCTS_PARQUET = ROOT / "outputs" / "lost_products.parquet"
 COLUMNS = ["invoice", "stock_code", "description", "invoice_date", "customer_id"]
-COLUMNS += ["quantity", "price"]
+COLUMNS += ["quantity", "price", "country"]
 PRODUCT_COLUMNS = ["stock_code", "description", "n_invoices", "in_rules"]
 TOP_COLUMNS = ["segment", "rank", "stock_code", "description"]
 TOP_COLUMNS += ["customer_share", "preference"]
@@ -133,6 +139,29 @@ def build_segment_top_products(
     return best.astype({"segment": "int64"})[TOP_COLUMNS]
 
 
+def write_customer_card(clean: pd.DataFrame) -> None:
+    """Rhythm, favourite products and lost products of each customer."""
+    profiles = customers.build_customer_profiles(clean)
+    profiles.to_parquet(CUSTOMER_PROFILES_PARQUET, index=False)
+    products = customers.build_customer_products(clean)
+    products.to_parquet(CUSTOMER_PRODUCTS_PARQUET, index=False)
+    ref_date = customers.reference_date(clean)
+    lost = customers.build_lost_products(clean, ref_date)
+    lost.to_parquet(LOST_PRODUCTS_PARQUET, index=False)
+    rhythm = profiles["usual_gap_days"].notna()
+    print(
+        f"Wrote {CUSTOMER_PROFILES_PARQUET.relative_to(ROOT)}: {len(profiles):,} customers"
+    )
+    print(f"  with a rhythm (2+ order days): {int(rhythm.sum()):,}")
+    print(f"  median usual gap: {profiles['usual_gap_days'].median():.0f} days")
+    print(
+        f"Wrote {CUSTOMER_PRODUCTS_PARQUET.relative_to(ROOT)}: {len(products):,} rows"
+    )
+    n_lost = lost["customer_id"].nunique()
+    print(f"Wrote {LOST_PRODUCTS_PARQUET.relative_to(ROOT)}: {len(lost):,} rows")
+    print(f"  customers with a lost product: {n_lost:,}")
+
+
 def main() -> None:
     """Write the small outputs, then read them back."""
     clean = pd.read_parquet(CLEAN_PARQUET, columns=COLUMNS)
@@ -148,6 +177,7 @@ def main() -> None:
     model = json.loads(METRICS_JSON.read_text())
     stats = build_stats(raw_rows, clean, rules, model)
     STATS_JSON.write_text(json.dumps(stats, indent=2))
+    write_customer_card(clean)
 
     products = pd.read_parquet(PRODUCTS_PARQUET)
     print(f"Wrote {PRODUCTS_PARQUET.relative_to(ROOT)}: {len(products):,} products")
