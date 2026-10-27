@@ -25,6 +25,8 @@ export const GLOSSARY = {
   calibration:
     "Compares the chance the score predicted with the share of customers who really ordered again.",
   probability: "The score's estimate of the chance that the customer orders again within 90 days.",
+  stake:
+    "What the customer spent, weighted by the chance they do not order again: £1,000 spent and a 20% chance gives £800. A way to rank, not a forecast of lost sales.",
 } as const;
 
 export type GlossaryKey = keyof typeof GLOSSARY;

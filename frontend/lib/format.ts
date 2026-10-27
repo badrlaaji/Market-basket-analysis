@@ -54,6 +54,11 @@ export function formatDate(date: string): string {
   return `${Number(day)} ${MONTHS[Number(number) - 1]} ${year}`;
 }
 
+/** 1 → "1 day ago"; 25 → "25 days ago" (days before the date of the data). */
+export function formatDaysAgo(days: number): string {
+  return days === 1 ? "1 day ago" : `${integer.format(days)} days ago`;
+}
+
 /** 51.45 → "51×"; 8.47 → "8.5×". */
 export function formatLift(value: number): string {
   return value >= 10 ? `${Math.round(value)}×` : `${value.toFixed(1)}×`;

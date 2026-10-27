@@ -17,6 +17,19 @@ SCENARIOS = 3  # example baskets on /basket
 SEED = 42  # sample of /segments/map
 CSV_COLUMNS = ["antecedent", "antecedent_names", "consequent", "consequent_name"]
 CSV_COLUMNS += ["support", "confidence", "lift"]
+# /at-risk/export: API column -> CSV header (plain words for a spreadsheet)
+AT_RISK_CSV = {
+    "customer_id": "customer_id",
+    "segment_name": "group",
+    "proba_90d": "chance_90d",
+    "recency": "last_order_days_ago",
+    "stake": "money_at_stake",
+    "monetary_net": "spent_net",
+    "monetary": "spent_gross",
+}
+AT_RISK_SORTS = {"spend": "monetary_net", "stake": "stake"}  # sort -> column
+# A spreadsheet runs a cell that starts with one of these as a formula (OWASP)
+FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
 
 def add_names(rules: pd.DataFrame, names: dict[str, str]) -> pd.DataFrame:
@@ -146,6 +159,12 @@ def basket_scenarios(rules: pd.DataFrame, k: int = SCENARIOS) -> pd.DataFrame:
     return pd.DataFrame(chosen, columns=["items", "names", "n_rules"])
 
 
+def add_stake_and_recency(scores: pd.DataFrame, segments: pd.DataFrame) -> pd.DataFrame:
+    """Days since the last order, and money at stake = net spend x (1 - chance)."""
+    scores = scores.merge(segments[["customer_id", "recency"]], on="customer_id")
+    return scores.assign(stake=scores["monetary_net"] * (1 - scores["proba_90d"]))
+
+
 def load_outputs(outputs_dir: Path) -> dict[str, Any]:
     """Read every output file of the pipeline (called once, at startup)."""
     products = pd.read_parquet(outputs_dir / "products.parquet")
@@ -166,7 +185,9 @@ def load_outputs(outputs_dir: Path) -> dict[str, Any]:
         "band_revenue": revenue_by_band(segments),
         "top_products": pd.read_parquet(outputs_dir / "segment_top_products.parquet"),
         "k_report": json.loads((outputs_dir / "segments_k_report.json").read_text()),
-        "scores": scores.merge(segment_names, on="segment", how="left"),
+        "scores": add_stake_and_recency(
+            scores.merge(segment_names, on="segment", how="left"), segments
+        ),
         "stats": json.loads((outputs_dir / "stats.json").read_text()),
         "timeline": pd.read_parquet(outputs_dir / "monthly_sales.parquet"),
         "model": json.loads((outputs_dir / "model_report.json").read_text()),
@@ -193,13 +214,33 @@ def filter_rules(
     return len(kept), kept.head(limit)
 
 
+def neutralize_formulas(table: pd.DataFrame) -> pd.DataFrame:
+    """Prefix a quote to text cells a spreadsheet would run; numbers are kept."""
+    safe = table.copy()
+    for column in safe.columns[safe.dtypes == object]:
+        safe[column] = safe[column].map(
+            lambda v: (
+                f"'{v}" if isinstance(v, str) and v.startswith(FORMULA_STARTS) else v
+            )
+        )
+    return safe
+
+
 def rules_csv(rules: pd.DataFrame) -> str:
     """Rules as CSV text; multi-product antecedents joined with " + "."""
     table = rules[CSV_COLUMNS].assign(
         antecedent=rules["antecedent"].map(" + ".join),
         antecedent_names=rules["antecedent_names"].map(" + ".join),
     )
-    return table.to_csv(index=False)
+    return neutralize_formulas(table).to_csv(index=False)
+
+
+def at_risk_csv(customers: pd.DataFrame) -> str:
+    """At-risk customers as CSV text, money rounded to the penny."""
+    table = customers[list(AT_RISK_CSV)].rename(columns=AT_RISK_CSV)
+    money = {"money_at_stake": 2, "spent_net": 2, "spent_gross": 2}
+    table = table.round({"chance_90d": 4, **money})
+    return neutralize_formulas(table).to_csv(index=False)
 
 
 def search_products(products: pd.DataFrame, q: str, limit: int) -> pd.DataFrame:
@@ -240,15 +281,19 @@ def in_segment(scores: pd.DataFrame, segment: int | None) -> pd.DataFrame:
 
 
 def at_risk(
-    scores: pd.DataFrame, threshold: float, top: int, segment: int | None = None
+    scores: pd.DataFrame,
+    threshold: float,
+    top: int,
+    segment: int | None = None,
+    sort: str = "spend",
 ) -> tuple[int, float, pd.DataFrame]:
-    """Customers with proba_90d < threshold, highest net value first.
+    """Customers with proba_90d < threshold, by net spend or money at stake.
 
     Also returns their total net spend (past purchases minus cancellations).
     """
     risky = in_segment(scores, segment)
     risky = risky[risky["proba_90d"] < threshold]
-    risky = risky.sort_values("monetary_net", ascending=False, kind="stable")
+    risky = risky.sort_values(AT_RISK_SORTS[sort], ascending=False, kind="stable")
     return len(risky), float(risky["monetary_net"].sum()), risky.head(top)
 
 

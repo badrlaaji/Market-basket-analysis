@@ -1,18 +1,38 @@
-"use client"; // the threshold slider and the segment filter update the chart and the list
+"use client"; // the slider, the group and the order update the answer, the list and the address
 
 import { useEffect, useState } from "react";
 import AnalystDetails from "@/components/AnalystDetails";
+import NextStep from "@/components/NextStep";
 import ProbaHistogram from "@/components/ProbaHistogram";
 import Term from "@/components/Term";
-import { formatCompactPounds, formatInt, formatPercent, formatPounds } from "@/lib/format";
-import { atRiskQuery, segmentQuery } from "@/lib/queries";
-import type { AtRiskPage, HistogramBin, SegmentProfile } from "@/lib/types";
+import {
+  formatCompactPounds,
+  formatDaysAgo,
+  formatInt,
+  formatPercent,
+  formatPounds,
+} from "@/lib/format";
+import {
+  THRESHOLD_MAX,
+  THRESHOLD_MIN,
+  THRESHOLD_STEP,
+  atRiskExportQuery,
+  atRiskQuery,
+  segmentQuery,
+  winBackSearch,
+  type WinBackState,
+} from "@/lib/queries";
+import type { AtRiskPage, AtRiskSort, HistogramBin, SegmentProfile } from "@/lib/types";
 import { useDebounce } from "@/lib/useDebounce";
 
 type Shown = { query: string; page: AtRiskPage };
 type Bins = { query: string; bins: HistogramBin[] };
 
 const FOLDED_ROWS = 10; // rows shown before "Show all"
+const SORT_LABELS: Record<AtRiskSort, string> = {
+  stake: "Most money at stake",
+  spend: "Highest spend",
+};
 
 /** GET a JSON route of Next.js; throws on an error status. */
 async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
@@ -21,39 +41,49 @@ async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-/** Live counters, customers to contact (highest net spend first), histogram for analysts. */
+/** Live answer, filters kept in the address, customers to call first, histogram for analysts. */
 export default function WinBackList({
-  initialThreshold,
-  initialSegment,
+  initialState,
   initialPage,
   initialBins,
   profiles,
 }: {
-  initialThreshold: number;
-  initialSegment: number | null;
+  initialState: WinBackState;
   initialPage: AtRiskPage;
   initialBins: HistogramBin[];
   profiles: SegmentProfile[];
 }) {
-  const [threshold, setThreshold] = useState(initialThreshold);
-  const [segment, setSegment] = useState(initialSegment);
+  const [threshold, setThreshold] = useState(initialState.threshold);
+  const [segment, setSegment] = useState(initialState.segment);
+  const [sort, setSort] = useState(initialState.sort);
   const [shown, setShown] = useState<Shown>({
-    query: atRiskQuery(initialThreshold, initialSegment),
+    query: atRiskQuery(initialState.threshold, initialState.segment, initialState.sort),
     page: initialPage,
   });
   const [histogram, setHistogram] = useState<Bins>({
-    query: segmentQuery(initialSegment),
+    query: segmentQuery(initialState.segment),
     bins: initialBins,
   });
   const [error, setError] = useState("");
   const [unfolded, setUnfolded] = useState(false);
 
-  const query = useDebounce(atRiskQuery(threshold, segment));
+  const state: WinBackState = { threshold, segment, sort };
+  const liveQuery = atRiskQuery(threshold, segment, sort);
+  const query = useDebounce(liveQuery);
   const binsQuery = segmentQuery(segment);
-  const loading = query !== shown.query || query !== atRiskQuery(threshold, segment);
+  const loading = query !== shown.query || query !== liveQuery;
+  const search = winBackSearch(state);
+
+  // The address keeps the filters: a shared link or Back gives the same list.
+  // replaceState, not the router: no new history entry, no server round trip.
+  useEffect(() => {
+    if (window.location.search !== search) {
+      window.history.replaceState(null, "", `${window.location.pathname}${search}`);
+    }
+  }, [search]);
 
   useEffect(() => {
-    if (query === shown.query) return; // the list already shows this threshold
+    if (query === shown.query) return; // the list already shows these filters
     const controller = new AbortController();
     getJson<AtRiskPage>(`/api/at-risk${query}`, controller.signal)
       .then((page) => {
@@ -80,10 +110,30 @@ export default function WinBackList({
 
   const { total, revenue_at_risk: revenue, customers } = shown.page;
   const segmentName = profiles.find((p) => p.segment === segment)?.segment_name;
-  const scope = segmentName ? `${segmentName} customers` : "Customers";
+  const who = segmentName ? `${segmentName} customers` : "customers";
+  const rows = unfolded ? customers : customers.slice(0, FOLDED_ROWS);
+  const order = sort === "stake" ? "with the most money at stake" : "who spent the most";
 
   return (
     <>
+      <header className="page-head">
+        <h1 className="question">Who is about to stop buying?</h1>
+        <p className={loading ? "answer is-loading" : "answer"} aria-live="polite">
+          {formatInt(total)} {who} may stop buying. Together they spent{" "}
+          {formatCompactPounds(revenue)}.
+        </p>
+        <p className="lede">
+          They have less than a {formatPercent(threshold, 0)} chance of ordering in the 90 days
+          after the date of the data. Choose who to contact first, then download the list for
+          the team.
+        </p>
+      </header>
+
+      <NextStep>
+        Call the customers at the top of the list first, with a personal offer: they have the
+        most money at stake.
+      </NextStep>
+
       <div className="controls">
         <label className="field">
           <span className="field-label">
@@ -94,9 +144,10 @@ export default function WinBackList({
           </span>
           <input
             type="range"
-            min={0.05}
-            max={0.9}
-            step={0.05}
+            name="threshold"
+            min={THRESHOLD_MIN}
+            max={THRESHOLD_MAX}
+            step={THRESHOLD_STEP}
             value={threshold}
             onChange={(e) => setThreshold(Number(e.target.value))}
           />
@@ -104,6 +155,7 @@ export default function WinBackList({
         <label className="field">
           Customer group
           <select
+            name="segment"
             value={segment ?? ""}
             onChange={(e) => setSegment(e.target.value === "" ? null : Number(e.target.value))}
           >
@@ -115,54 +167,79 @@ export default function WinBackList({
             ))}
           </select>
         </label>
+        <label className="field">
+          Contact first
+          <select name="sort" value={sort} onChange={(e) => setSort(e.target.value as AtRiskSort)}>
+            {(Object.keys(SORT_LABELS) as AtRiskSort[]).map((key) => (
+              <option key={key} value={key}>
+                {SORT_LABELS[key]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <a className="button" href={`/api/at-risk/export${atRiskExportQuery(state)}`} download>
+          <span aria-hidden="true">↓</span> Download the list (CSV)
+        </a>
       </div>
-
-      <dl className={loading ? "counters is-loading" : "counters"} aria-live="polite">
-        <div>
-          <dt>{scope} to contact</dt>
-          <dd>{formatInt(total)}</dd>
-        </div>
-        <div>
-          <dt>
-            What they spent in two years (<Term id="netSpend">net</Term>)
-          </dt>
-          <dd>{formatCompactPounds(revenue)}</dd>
-        </div>
-      </dl>
-      {error && <p className="error-text">{error}</p>}
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
 
       <section aria-labelledby="list-title">
         <div className="section-head">
           <h2 id="list-title">Who to contact first</h2>
           <p className="note">
-            The {formatInt(Math.min(customers.length, unfolded ? customers.length : FOLDED_ROWS))}{" "}
-            who spent the most
-            {loading ? ", updating" : ""}.
+            <Term id="stake">Money at stake</Term> = spent × chance of not coming back
           </p>
         </div>
+        <p className="note list-status">
+          The {formatInt(rows.length)} {order}
+          {total > customers.length ? `, of ${formatInt(total)}` : ""}
+          {loading ? ", updating…" : "."}
+        </p>
         <div className={loading ? "is-loading" : undefined}>
           {customers.length > 0 ? (
             <div className="table-wrap">
-              <table>
-                <caption className="visually-hidden">Customers to win back</caption>
+              <table className="win-back-table">
+                <caption className="visually-hidden">
+                  Customers to win back, {SORT_LABELS[sort].toLowerCase()} first
+                </caption>
                 <thead>
                   <tr>
-                    <th scope="col">Customer number</th>
+                    <th scope="col">Customer</th>
                     <th scope="col">Group</th>
-                    <th scope="col">Chance of ordering in 90 days</th>
-                    <th scope="col" className="num" title="Purchases minus cancelled products">
-                      Spent (net)
+                    <th scope="col">Chance of ordering</th>
+                    <th scope="col">Last order</th>
+                    <th
+                      scope="col"
+                      className="num"
+                      aria-sort={sort === "stake" ? "descending" : undefined}
+                    >
+                      Money at stake
                     </th>
-                    <th scope="col" className="num" title="Purchases only, as in the groups">
-                      Before cancellations
+                    <th
+                      scope="col"
+                      className="num"
+                      aria-sort={sort === "spend" ? "descending" : undefined}
+                      title="Purchases minus cancelled products"
+                    >
+                      Spent (net)
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(unfolded ? customers : customers.slice(0, FOLDED_ROWS)).map((customer) => (
+                  {rows.map((customer) => (
                     <tr key={customer.customer_id}>
                       <td className="num-id">{customer.customer_id}</td>
-                      <td>{customer.segment_name}</td>
+                      <td>
+                        <span
+                          className={`swatch seg-${customer.segment}`}
+                          aria-hidden="true"
+                        />{" "}
+                        {customer.segment_name}
+                      </td>
                       <td>
                         <div className="cell-meter">
                           <span>{formatPercent(customer.proba_90d, 0)}</span>
@@ -171,20 +248,29 @@ export default function WinBackList({
                           </div>
                         </div>
                       </td>
+                      <td>{formatDaysAgo(customer.recency)}</td>
+                      <td className={customer.stake < 0 ? "num loss" : "num strong"}>
+                        {formatPounds(customer.stake)}
+                      </td>
                       <td className={customer.monetary_net < 0 ? "num loss" : "num"}>
                         {formatPounds(customer.monetary_net)}
                       </td>
-                      <td className="num">{formatPounds(customer.monetary)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p className="empty">
-              No customer is below this chance. Move the slider to the right or pick another
-              group.
-            </p>
+            <div className="empty">
+              <p>No customer with these filters. Move the slider to the right to widen it.</p>
+              {segment !== null && (
+                <p className="more">
+                  <button type="button" onClick={() => setSegment(null)}>
+                    Show every group
+                  </button>
+                </p>
+              )}
+            </div>
           )}
         </div>
         {!unfolded && customers.length > FOLDED_ROWS && (
