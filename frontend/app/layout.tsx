@@ -38,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <div className="site-header-inner">
             <Link href="/" className="brand" translate="no">
               <Logo />
-              Market Basket Analysis
+              <span className="brand-name">Market Basket Analysis</span>
             </Link>
             <nav aria-label="Main">
               <NavLinks />

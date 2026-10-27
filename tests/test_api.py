@@ -80,6 +80,33 @@ TRANSITIONS = pd.DataFrame(
         "date_now": ["2011-12-10"] * 4,
     }
 )
+# Customer card: 105 is regular (every 20 days), 103 overdue, 102 ordered once
+CUSTOMER_PROFILES = pd.DataFrame(
+    {
+        "customer_id": [101, 102, 103, 104, 105, 106],
+        "country": ["United Kingdom", "France", "Spain", "EIRE", "Germany", "Spain"],
+        "first_order": ["2010-01-04"] * 6,
+        "n_order_days": [10, 1, 2, 1, 8, 6],
+        "usual_gap_days": [4.0, None, 100.0, None, 20.0, 15.0],
+    }
+)
+CUSTOMER_PRODUCTS = pd.DataFrame(
+    {
+        "customer_id": [105, 105, 105, 105, 102],
+        "rank": [1, 2, 3, 4, 1],
+        "stock_code": ["A", "D", "E", "B", "E"],
+        "n_orders": [5, 3, 2, 1, 1],
+    }
+)
+LOST_PRODUCTS = pd.DataFrame(
+    {
+        "customer_id": [105],
+        "stock_code": ["E"],
+        "n_orders": [4],
+        "usual_gap_days": [30.0],
+        "days_since": [90],
+    }
+)
 MONTHLY = pd.DataFrame(
     {
         "month": ["2011-11", "2011-12"],
@@ -148,6 +175,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     TOP_PRODUCTS.to_parquet(tmp_path / "segment_top_products.parquet")
     MONTHLY.to_parquet(tmp_path / "monthly_sales.parquet")
     TRANSITIONS.to_parquet(tmp_path / "segment_transitions.parquet")
+    CUSTOMER_PROFILES.to_parquet(tmp_path / "customer_profiles.parquet")
+    CUSTOMER_PRODUCTS.to_parquet(tmp_path / "customer_products.parquet")
+    LOST_PRODUCTS.to_parquet(tmp_path / "lost_products.parquet")
     (tmp_path / "stats.json").write_text(json.dumps(STATS))
     (tmp_path / "model_report.json").write_text(json.dumps(MODEL_REPORT))
     (tmp_path / "segments_k_report.json").write_text(json.dumps(K_REPORT))
@@ -534,3 +564,79 @@ def test_csv_cells_cannot_start_a_formula() -> None:
     assert list(safe["name"]) == ["'=SUM(A1)", "'+33", "'-cmd", "'@me", "Mug", "'\tx"]
     assert list(safe["value"]) == [-25.5, 1.0, 2.0, 3.0, 4.0, 5.0]
     assert table.loc[0, "name"] == "=SUM(A1)"  # the input is not changed
+
+
+def test_customer_card_regular_customer(client: TestClient) -> None:
+    """105: ordered 10 days ago, usually every 20 days: not overdue; low risk."""
+    card = client.get("/customers/105").json()
+    assert (card["segment_name"], card["country"], card["recency"]) == (
+        "Champions",
+        "Germany",
+        10,
+    )
+    assert (card["usual_gap_days"], card["overdue"], card["rough_rhythm"]) == (
+        20.0,
+        False,
+        False,
+    )
+    # probas ranked 104 < 103 < 102 < 106 < 105 < 101: 105 is 5th of 6 -> decile 9
+    assert (card["risk_decile"], card["risk_level"]) == (9, "low")
+    assert card["stake"] == pytest.approx(360.0)
+    assert card["average_order"] == pytest.approx(900.0 / 8)
+
+
+def test_customer_card_products_lost_and_offers(client: TestClient) -> None:
+    """Top 3 still bought (E, lost, is listed apart); offers: not his own products."""
+    card = client.get("/customers/105").json()
+    assert [p["stock_code"] for p in card["products"]] == ["A", "D", "B"]
+    assert card["products"][0] == {
+        "stock_code": "A",
+        "description": "RED MUG",
+        "n_orders": 5,
+    }
+    assert card["lost_products"] == [
+        {
+            "stock_code": "E",
+            "description": "TEA SET",
+            "n_orders": 4,
+            "usual_gap_days": 30.0,
+            "days_since": 90,
+        }
+    ]
+    # basket {A, D, E, B}: C (A + D, lift 4) only; B is his own product
+    offers = card["offers"]
+    assert [(o["stock_code"], o["kind"]) for o in offers][:1] == [("C", "pattern")]
+    assert offers[0]["because"] == ["RED MUG", "PINK BAG"]
+    assert offers[0]["lift"] == 4.0
+    assert all(o["stock_code"] not in {"A", "B", "D", "E"} for o in offers)
+
+
+def test_customer_card_without_rhythm_gets_best_sellers(client: TestClient) -> None:
+    """102 ordered on one day only: no rhythm; no rule from E: best sellers, labelled."""
+    card = client.get("/customers/102").json()
+    assert (card["usual_gap_days"], card["overdue"]) == (None, None)
+    assert card["risk_level"] == "medium"  # 3rd of 6 -> decile 5
+    assert [(o["stock_code"], o["kind"]) for o in card["offers"]] == [
+        ("A", "best_seller"),
+        ("B", "best_seller"),
+    ]
+    assert card["offers"][0]["because"] == []
+    assert card["lost_products"] == []
+
+
+def test_customer_card_overdue_and_rough_rhythm(client: TestClient) -> None:
+    """103: 400 days since the last order, usually 100: overdue (> 1.5 x 100).
+
+    Only 2 order days: the rhythm is rough. 104 is the lowest score: high risk.
+    """
+    card = client.get("/customers/103").json()
+    assert (card["overdue"], card["rough_rhythm"]) == (True, True)
+    assert client.get("/customers/104").json()["risk_level"] == "high"
+
+
+@pytest.mark.parametrize(("path", "status"), [("999", 404), ("abc", 422)])
+def test_customer_card_unknown_customer(
+    client: TestClient, path: str, status: int
+) -> None:
+    """An unknown number: 404; not a number: 422."""
+    assert client.get(f"/customers/{path}").status_code == status

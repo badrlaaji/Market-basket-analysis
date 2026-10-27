@@ -125,6 +125,7 @@ mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db   # experiments on http
 | `GET /segments/transitions` | Customers moving between segments in the last 90 days |
 | `GET /at-risk?threshold=&top=&segment=&sort=` | Customers below a repurchase probability, with the days since their last order and the money at stake (net spend × (1 − probability)); `sort=spend` (default) or `sort=stake`; plus the total net spend of all of them |
 | `GET /at-risk/export?threshold=&segment=&sort=` | Every customer matching the `/at-risk` filters, as a CSV file; text cells that a spreadsheet would run as a formula are neutralised |
+| `GET /customers/{id}` | Customer card: usual rhythm (median gap between orders) and whether the customer is overdue, risk level by tenth of the score, money at stake, products still bought, products no longer bought, what to offer (buying patterns first, best sellers labelled as such) |
 | `GET /at-risk/histogram?segment=` | Customers and net spend per probability band of 0.05 |
 | `GET /model` | Model metrics, precision-recall and ROC curves against the baseline, calibration per decile, feature importances |
 | `GET /timeline` | Revenue, invoices and customers per month; partial months flagged |
@@ -143,7 +144,7 @@ Parameters are validated (for example `min_confidence` and `threshold` in [0, 1]
 | `/rules` (in Sell more) | Which products sell together? | Filter by product, how often and strength; read a pattern in plain words; CSV download. Analysts: map of every rule, flows, one product's rules, distributions |
 | `/basket` Sell more | What else goes in this basket? | Example baskets, popular products, search; the basket as a receipt with "customers often add" |
 | `/segments` Customers | Who are the customers? | Share of customers against share of spending, a card per group. Analysts: scatter, radar, RFM grid, treemap, 90-day moves, silhouette per k |
-| `/win-back` Win back | Who is about to stop buying? | Chance-of-ordering slider, filter by group, contact first by money at stake or by spend, last order, CSV download; the filters stay in the address. Analysts: probability histogram |
+| `/win-back` Win back | Who is about to stop buying? | Chance-of-ordering slider, filter by group, contact first by money at stake or by spend, last order, CSV download; the filters stay in the address. A click opens the customer card beside the list (full screen on a phone): why now, what they buy and no longer buy, what to offer, Previous / Next. Analysts: probability histogram |
 | `/model` (footer link: Can I trust these numbers?) | Can we trust the score? | Share of customers who came back per tenth of the score, what the score looks at. Analysts: PR and ROC curves, calibration |
 
 </details>
@@ -152,7 +153,8 @@ Parameters are validated (for example `min_confidence` and `threshold` in [0, 1]
 
 ```
 pipeline/      ingest.py (Excel → Parquet), etl.py (cleaning), rules.py (FP-Growth),
-               segments.py (RFM + KMeans), export.py, run_all.py (one command for every output),
+               segments.py (RFM + KMeans), export.py, customers.py (rhythm, favourite and
+               lost products of each customer: rules, not ML), run_all.py (one command for every output),
                spark_session.py (shared Spark settings), tracking.py (MLflow)
 ml/            repurchase.py: features before a date, XGBoost vs baseline, final scores
 api/           main.py (FastAPI, outputs loaded once), queries.py (pandas), schemas.py (Pydantic), Dockerfile

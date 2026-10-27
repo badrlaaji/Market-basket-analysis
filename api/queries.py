@@ -28,6 +28,16 @@ AT_RISK_CSV = {
     "monetary": "spent_gross",
 }
 AT_RISK_SORTS = {"spend": "monetary_net", "stake": "stake"}  # sort -> column
+# Customer card
+OVERDUE_FACTOR = 1.5  # overdue: last order more than 1.5 x the usual gap ago
+ROUGH_RHYTHM_DAYS = 4  # under 4 order days, the usual gap rests on 1 or 2 gaps
+CARD_PRODUCTS = 3  # "What they usually buy"
+CARD_OFFERS = 3  # patterns first; best sellers fill up to MIN_OFFERS
+MIN_OFFERS = 2
+# Risk of leaving by decile of the score: 1-3 high, 4-7 medium, 8-10 low
+RISK_LEVELS = {
+    d: "high" if d <= 3 else "medium" if d <= 7 else "low" for d in range(1, 11)
+}
 # A spreadsheet runs a cell that starts with one of these as a formula (OWASP)
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
@@ -161,8 +171,14 @@ def basket_scenarios(rules: pd.DataFrame, k: int = SCENARIOS) -> pd.DataFrame:
 
 def add_stake_and_recency(scores: pd.DataFrame, segments: pd.DataFrame) -> pd.DataFrame:
     """Days since the last order, and money at stake = net spend x (1 - chance)."""
-    scores = scores.merge(segments[["customer_id", "recency"]], on="customer_id")
-    return scores.assign(stake=scores["monetary_net"] * (1 - scores["proba_90d"]))
+    columns = ["customer_id", "recency", "frequency"]
+    scores = scores.merge(segments[columns], on="customer_id")
+    # Decile 1 = the tenth of customers with the lowest chance of ordering again
+    decile = np.ceil(scores["proba_90d"].rank(method="first", pct=True) * 10)
+    return scores.assign(
+        stake=scores["monetary_net"] * (1 - scores["proba_90d"]),
+        risk_decile=decile.astype(int),
+    )
 
 
 def load_outputs(outputs_dir: Path) -> dict[str, Any]:
@@ -193,7 +209,23 @@ def load_outputs(outputs_dir: Path) -> dict[str, Any]:
         "model": json.loads((outputs_dir / "model_report.json").read_text()),
         "scenarios": basket_scenarios(named_rules),
         "transitions": pd.read_parquet(outputs_dir / "segment_transitions.parquet"),
+        # Customer card: indexed by customer for a fast lookup per click
+        "profiles_by_id": pd.read_parquet(
+            outputs_dir / "customer_profiles.parquet"
+        ).set_index("customer_id"),
+        "customer_products": by_customer(outputs_dir / "customer_products.parquet"),
+        "lost_products": by_customer(outputs_dir / "lost_products.parquet"),
     }
+
+
+def by_customer(path: Path) -> pd.DataFrame:
+    """A per-customer table, indexed (and sorted) by customer_id."""
+    return pd.read_parquet(path).set_index("customer_id").sort_index(kind="stable")
+
+
+def rows_for(table: pd.DataFrame, customer_id: int) -> pd.DataFrame:
+    """Rows of one customer in a table indexed by customer_id (maybe none)."""
+    return table.loc[[customer_id]] if customer_id in table.index else table.iloc[:0]
 
 
 def filter_rules(
@@ -311,3 +343,86 @@ def proba_histogram(scores: pd.DataFrame, segment: int | None = None) -> pd.Data
     table["start"] = table.index / HISTOGRAM_BINS
     table["end"] = (table.index + 1) / HISTOGRAM_BINS
     return table.reset_index(drop=True)
+
+
+def card_offers(
+    data: dict[str, Any], customer_codes: list[str], names: dict[str, str]
+) -> list[dict[str, Any]]:
+    """What to offer: products his favourite ones lead to, else best sellers.
+
+    Best sellers are labelled as such: they are not a buying pattern.
+    """
+    best, _ = recommend(data["rules"], data["known_codes"], customer_codes, CARD_OFFERS)
+    offers = [
+        {
+            "stock_code": row.consequent,
+            "description": row.consequent_name,
+            "kind": "pattern",
+            "confidence": row.confidence,
+            "lift": row.lift,
+            "because": [names.get(code, code) for code in row.antecedent],
+        }
+        for row in best.itertuples()
+    ]
+    taken = set(customer_codes) | {offer["stock_code"] for offer in offers}
+    for row in data["products"].itertuples():  # sorted by n_invoices: best first
+        if len(offers) >= MIN_OFFERS:
+            break
+        if row.stock_code not in taken:
+            offers.append(
+                {
+                    "stock_code": row.stock_code,
+                    "description": row.description,
+                    "kind": "best_seller",
+                    "confidence": None,
+                    "lift": None,
+                    "because": [],
+                }
+            )
+    return offers
+
+
+def customer_card(data: dict[str, Any], customer_id: int) -> dict[str, Any] | None:
+    """Everything the card shows for one customer; None if unknown."""
+    scores = data["scores"]
+    found = scores[scores["customer_id"] == customer_id]
+    if found.empty or customer_id not in data["profiles_by_id"].index:
+        return None
+    score = found.iloc[0]
+    profile = data["profiles_by_id"].loc[customer_id]
+    names = dict(zip(data["products"]["stock_code"], data["products"]["description"]))
+    gap = (
+        None if pd.isna(profile["usual_gap_days"]) else float(profile["usual_gap_days"])
+    )
+    products = rows_for(data["customer_products"], customer_id)
+    lost = rows_for(data["lost_products"], customer_id)
+    # "What they usually buy" = still bought: a lost product is listed apart
+    usual = products[~products["stock_code"].isin(lost["stock_code"])]
+    return {
+        **score[["customer_id", "segment", "segment_name", "proba_90d"]].to_dict(),
+        **score[
+            ["monetary", "monetary_net", "stake", "recency", "risk_decile"]
+        ].to_dict(),
+        "risk_level": RISK_LEVELS[int(score["risk_decile"])],
+        "n_orders": int(score["frequency"]),
+        "average_order": float(score["monetary_net"] / score["frequency"]),
+        "country": profile["country"],
+        "first_order": profile["first_order"],
+        "n_order_days": int(profile["n_order_days"]),
+        "usual_gap_days": gap,
+        "overdue": None
+        if gap is None
+        else bool(score["recency"] > OVERDUE_FACTOR * gap),
+        "rough_rhythm": int(profile["n_order_days"]) < ROUGH_RHYTHM_DAYS,
+        "products": [
+            {**row, "description": names.get(row["stock_code"], row["stock_code"])}
+            for row in usual.head(CARD_PRODUCTS)[["stock_code", "n_orders"]].to_dict(
+                orient="records"
+            )
+        ],
+        "lost_products": [
+            {**row, "description": names.get(row["stock_code"], row["stock_code"])}
+            for row in lost.to_dict(orient="records")
+        ],
+        "offers": card_offers(data, products["stock_code"].tolist(), names),
+    }

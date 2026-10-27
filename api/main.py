@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import pandas as pd
-from fastapi import FastAPI, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from api import queries
@@ -19,6 +19,7 @@ from api.schemas import (
     AtRiskPage,
     BandRevenue,
     BasketIn,
+    CustomerCard,
     Flow,
     GridCell,
     Health,
@@ -262,3 +263,12 @@ def export_at_risk(
 def get_at_risk_histogram(segment: Segment = None) -> list[HistogramBin]:
     """Customers and net spend per repurchase probability bin (width 0.05)."""
     return to_models(queries.proba_histogram(DATA["scores"], segment), HistogramBin)
+
+
+@app.get("/customers/{customer_id}")
+def get_customer(customer_id: int) -> CustomerCard:
+    """Customer card: why now (rhythm, risk), what they buy, what to offer."""
+    card = queries.customer_card(DATA, customer_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="Unknown customer number.")
+    return CustomerCard(**card)
