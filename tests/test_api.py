@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from api import queries
 from api.main import app
 
 PRODUCTS = pd.DataFrame(
@@ -443,8 +444,93 @@ def test_at_risk_histogram(client: TestClient) -> None:
 
 
 @pytest.mark.parametrize(
-    "query", ["threshold=1.5", "threshold=-0.1", "top=0", "segment=-1"]
+    "query",
+    ["threshold=1.5", "threshold=-0.1", "top=0", "segment=-1", "sort=price"],
 )
 def test_at_risk_rejects_bad_parameters(client: TestClient, query: str) -> None:
-    """Threshold outside [0, 1] or top < 1: 422."""
+    """Threshold outside [0, 1], top < 1 or an unknown sort: 422."""
     assert client.get(f"/at-risk?{query}").status_code == 422
+
+
+def test_at_risk_returns_recency_and_stake(client: TestClient) -> None:
+    """recency comes from the segments; stake = net spend x (1 - chance)."""
+    body = client.get("/at-risk?threshold=0.3").json()
+    first = body["customers"][0]
+    assert first["customer_id"] == 102
+    assert first["recency"] == 300
+    assert first["stake"] == pytest.approx(300.0 * (1 - 0.2))
+
+
+def test_at_risk_sort_by_stake(client: TestClient) -> None:
+    """101 spent more than 102 but will likely come back (0.9): less at stake."""
+    body = client.get("/at-risk?threshold=1&sort=stake").json()
+    # stakes: 105 360, 102 240, 104 95, 101 50, 106 37.5, 103 0
+    assert [c["customer_id"] for c in body["customers"]] == [
+        105,
+        102,
+        104,
+        101,
+        106,
+        103,
+    ]
+    assert [c["stake"] for c in body["customers"]] == pytest.approx(
+        [360.0, 240.0, 95.0, 50.0, 37.5, 0.0]
+    )
+
+
+def test_at_risk_default_sort_is_unchanged(client: TestClient) -> None:
+    """Without sort, or with sort=spend: highest net spend first, as before."""
+    default = client.get("/at-risk?threshold=1").json()
+    spend = client.get("/at-risk?threshold=1&sort=spend").json()
+    expected = [105, 101, 102, 104, 106, 103]
+    assert [c["customer_id"] for c in default["customers"]] == expected
+    assert [c["customer_id"] for c in spend["customers"]] == expected
+
+
+def test_at_risk_export_csv(client: TestClient) -> None:
+    """Same filters and sort as /at-risk, no limit; one row per customer."""
+    response = client.get("/at-risk/export?threshold=1&sort=stake")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+    lines = response.text.splitlines()
+    assert lines[0] == (
+        "customer_id,group,chance_90d,last_order_days_ago,money_at_stake,"
+        "spent_net,spent_gross"
+    )
+    assert len(lines) == 1 + 6  # header + every customer below 1
+    assert lines[1] == "105,Champions,0.6,10,360.0,900.0,1000.0"
+    assert [line.split(",")[0] for line in lines[1:]] == [
+        "105",
+        "102",
+        "104",
+        "101",
+        "106",
+        "103",
+    ]
+
+
+def test_at_risk_export_one_segment(client: TestClient) -> None:
+    """segment=0 and threshold 0.3: only customer 106."""
+    lines = client.get("/at-risk/export?threshold=0.3&segment=0").text.splitlines()
+    assert [line.split(",")[0] for line in lines[1:]] == ["106"]
+
+
+@pytest.mark.parametrize("query", ["threshold=2", "sort=price", "segment=-1"])
+def test_at_risk_export_rejects_bad_parameters(client: TestClient, query: str) -> None:
+    """The export validates its filters like /at-risk."""
+    assert client.get(f"/at-risk/export?{query}").status_code == 422
+
+
+def test_csv_cells_cannot_start_a_formula() -> None:
+    """Text starting with =, +, -, @ gets a quote; numbers stay numbers."""
+    table = pd.DataFrame(
+        {
+            "name": ["=SUM(A1)", "+33", "-cmd", "@me", "Mug", "\tx"],
+            "value": [-25.5, 1.0, 2.0, 3.0, 4.0, 5.0],
+        }
+    )
+    safe = queries.neutralize_formulas(table)
+    assert list(safe["name"]) == ["'=SUM(A1)", "'+33", "'-cmd", "'@me", "Mug", "'\tx"]
+    assert list(safe["value"]) == [-25.5, 1.0, 2.0, 3.0, 4.0, 5.0]
+    assert table.loc[0, "name"] == "=SUM(A1)"  # the input is not changed

@@ -52,6 +52,9 @@ MinLift = Annotated[float, Query(ge=0)]
 ProductText = Annotated[str | None, Query(max_length=100)]
 RuleSort = Literal["lift", "confidence", "support"]
 Segment = Annotated[int | None, Query(ge=0)]  # None: every segment
+# Filters shared by /at-risk and /at-risk/export
+Threshold = Annotated[float, Query(ge=0, le=1)]
+AtRiskSort = Literal["spend", "stake"]  # stake = net spend x (1 - chance)
 
 
 @asynccontextmanager
@@ -223,16 +226,35 @@ def get_stats() -> Stats:
 
 @app.get("/at-risk")
 def get_at_risk(
-    threshold: Annotated[float, Query(ge=0, le=1)] = 0.3,
+    threshold: Threshold = 0.3,
     top: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = 50,
     segment: Segment = None,
+    sort: AtRiskSort = "spend",
 ) -> AtRiskPage:
-    """Customers unlikely to buy within 90 days, highest net value first."""
-    total, revenue, customers = queries.at_risk(DATA["scores"], threshold, top, segment)
+    """Customers unlikely to buy within 90 days, by net spend or money at stake."""
+    total, revenue, customers = queries.at_risk(
+        DATA["scores"], threshold, top, segment, sort
+    )
     return AtRiskPage(
         total=total,
         revenue_at_risk=revenue,
         customers=to_models(customers, AtRiskCustomer),
+    )
+
+
+@app.get("/at-risk/export", response_class=Response)
+def export_at_risk(
+    threshold: Threshold = 0.3,
+    segment: Segment = None,
+    sort: AtRiskSort = "spend",
+) -> Response:
+    """Every customer matching the filters, as a CSV file (no limit)."""
+    scores = DATA["scores"]
+    _, _, customers = queries.at_risk(scores, threshold, len(scores), segment, sort)
+    return Response(
+        queries.at_risk_csv(customers),
+        media_type="text/csv",
+        headers={"content-disposition": 'attachment; filename="win-back.csv"'},
     )
 
 

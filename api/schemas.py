@@ -209,7 +209,9 @@ class AtRiskCustomer(BaseModel):
     segment: int
     segment_name: str
     monetary: float  # gross: purchases only (as in the segments)
-    monetary_net: float  # gross + cancellations: used to sort /at-risk
+    monetary_net: float  # gross + cancellations: default sort of /at-risk
+    recency: int  # days since the last order, at the reference date
+    stake: float  # money at stake = monetary_net x (1 - proba_90d)
 
 
 class AtRiskPage(BaseModel):

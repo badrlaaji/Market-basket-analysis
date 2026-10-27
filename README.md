@@ -96,7 +96,8 @@ PySpark is built from source during `pip install`; if `/tmp` is a small tmpfs, s
 
 ```bash
 source .venv/bin/activate
-pytest -q                                            # 88 tests (Java needed for the Spark ones)
+pip install -r api/requirements.txt                  # FastAPI and httpx, needed by tests/test_api.py
+pytest -q                                            # every test (Java needed for the Spark ones)
 uvicorn api.main:app                                 # API on http://localhost:8000/docs (Swagger UI)
 cd frontend && npm ci && npm run dev                 # web app on http://localhost:3000
 mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db   # experiments on http://127.0.0.1:5000
@@ -122,7 +123,8 @@ mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db   # experiments on http
 | `GET /segments/grid` | Customers per recency fifth × invoice band (1, 2, 3–4, 5–9, 10+) |
 | `GET /segments/k` | Silhouette for k = 2 to 8 and the k kept |
 | `GET /segments/transitions` | Customers moving between segments in the last 90 days |
-| `GET /at-risk?threshold=&top=&segment=` | Customers below a repurchase probability, highest net spend first, with the total net spend of all of them |
+| `GET /at-risk?threshold=&top=&segment=&sort=` | Customers below a repurchase probability, with the days since their last order and the money at stake (net spend × (1 − probability)); `sort=spend` (default) or `sort=stake`; plus the total net spend of all of them |
+| `GET /at-risk/export?threshold=&segment=&sort=` | Every customer matching the `/at-risk` filters, as a CSV file; text cells that a spreadsheet would run as a formula are neutralised |
 | `GET /at-risk/histogram?segment=` | Customers and net spend per probability band of 0.05 |
 | `GET /model` | Model metrics, precision-recall and ROC curves against the baseline, calibration per decile, feature importances |
 | `GET /timeline` | Revenue, invoices and customers per month; partial months flagged |
@@ -137,12 +139,12 @@ Parameters are validated (for example `min_confidence` and `threshold` in [0, 1]
 
 | Page (menu) | Question | What you can do |
 | --- | --- | --- |
-| `/` Summary | What do two years of orders say? | Three questions with their answer, monthly sales with the peaks, four key figures |
-| `/rules` Bought together | Which products sell together? | Filter by product, how often and strength; read a pattern in plain words; CSV download. Analysts: map of every rule, flows, one product's rules, distributions |
-| `/basket` Basket helper | What else goes in this basket? | Example baskets, popular products, search; the basket as a receipt with "customers often add" |
-| `/segments` Customer groups | Who are the customers? | Share of customers against share of spending, a card per group. Analysts: scatter, radar, RFM grid, treemap, 90-day moves, silhouette per k |
-| `/win-back` Win back | Who is about to stop buying? | Chance-of-ordering slider, filter by group, customers to contact first. Analysts: probability histogram |
-| `/model` Score reliability | Can we trust the score? | Share of customers who came back per tenth of the score, what the score looks at. Analysts: PR and ROC curves, calibration |
+| `/` This week | What do two years of orders say? | Three questions with their answer, monthly sales with the peaks, four key figures |
+| `/rules` (in Sell more) | Which products sell together? | Filter by product, how often and strength; read a pattern in plain words; CSV download. Analysts: map of every rule, flows, one product's rules, distributions |
+| `/basket` Sell more | What else goes in this basket? | Example baskets, popular products, search; the basket as a receipt with "customers often add" |
+| `/segments` Customers | Who are the customers? | Share of customers against share of spending, a card per group. Analysts: scatter, radar, RFM grid, treemap, 90-day moves, silhouette per k |
+| `/win-back` Win back | Who is about to stop buying? | Chance-of-ordering slider, filter by group, contact first by money at stake or by spend, last order, CSV download; the filters stay in the address. Analysts: probability histogram |
+| `/model` (footer link: Can I trust these numbers?) | Can we trust the score? | Share of customers who came back per tenth of the score, what the score looks at. Analysts: PR and ROC curves, calibration |
 
 </details>
 

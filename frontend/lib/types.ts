@@ -177,8 +177,12 @@ export type AtRiskCustomer = {
   segment: number;
   segment_name: string;
   monetary: number; // gross: purchases only
-  monetary_net: number; // gross + cancellations, used for the order
+  monetary_net: number; // gross + cancellations
+  recency: number; // days since the last order, at the date of the data
+  stake: number; // money at stake = monetary_net × (1 − proba_90d)
 };
+
+export type AtRiskSort = "stake" | "spend";
 
 export type AtRiskPage = {
   total: number; // customers below the threshold, before the limit
